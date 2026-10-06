@@ -1,5 +1,52 @@
+import fs from 'fs';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_COUPONS, INITIAL_REVIEWS, INITIAL_ORDERS, INITIAL_USERS } from '../src/lib/seed-data';
+
+// Always load .env from the project root folder (the parent of /prisma),
+// regardless of the directory the command is run from. Works for both
+// `tsx prisma/seed.ts` (local) and the bundled `node prisma/seed.js` (cPanel).
+// Values in the project .env override anything already set in the environment.
+function loadProjectEnv() {
+  const projectRoot = path.resolve(__dirname, '..');
+  const envPath = path.join(projectRoot, '.env');
+
+  if (!fs.existsSync(envPath)) {
+    console.warn(`[seed] .env not found at ${envPath}`);
+    return;
+  }
+
+  const content = fs.readFileSync(envPath, 'utf8').replace(/^\uFEFF/, '');
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match) continue;
+
+    const key = match[1];
+    let value = match[2].trim();
+
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    } else {
+      // Strip inline comments for unquoted values
+      const hashIndex = value.indexOf(' #');
+      if (hashIndex !== -1) value = value.slice(0, hashIndex).trim();
+    }
+
+    process.env[key] = value;
+  }
+
+  console.log(`[seed] Loaded environment from ${envPath}`);
+}
+
+loadProjectEnv();
+
+if (!process.env.DATABASE_URL) {
+  console.error('[seed] DATABASE_URL is missing. Add it to the project .env file.');
+  process.exit(1);
+}
 
 const prisma = new PrismaClient();
 

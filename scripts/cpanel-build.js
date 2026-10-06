@@ -129,6 +129,32 @@ if (fs.existsSync(subFrontendDir)) {
   );
 }
 
+// 6b. Bundle seed script into plain JS (production has no tsx and no src/ folder)
+console.log('\n> Bundling prisma/seed.ts -> prisma/seed.js...');
+try {
+  const esbuild = require('esbuild');
+  const seedTargets = [path.join(standaloneDir, 'prisma', 'seed.js')];
+  if (fs.existsSync(subFrontendDir)) {
+    seedTargets.push(path.join(subFrontendDir, 'prisma', 'seed.js'));
+  }
+  for (const outfile of seedTargets) {
+    esbuild.buildSync({
+      entryPoints: [path.join(rootDir, 'prisma', 'seed.ts')],
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      target: 'node18',
+      external: ['@prisma/client', '.prisma/client'],
+      tsconfig: path.join(rootDir, 'tsconfig.json'),
+      outfile,
+      logLevel: 'warning',
+    });
+  }
+} catch (error) {
+  console.error('\nSeed bundling failed! Aborting cPanel preparation.', error);
+  process.exit(1);
+}
+
 // 7. Copy sample .env to standalone
 const sampleEnv = path.join(rootDir, '.env.example');
 if (fs.existsSync(sampleEnv)) {
