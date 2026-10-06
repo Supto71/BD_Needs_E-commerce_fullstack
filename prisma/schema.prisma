@@ -1,0 +1,281 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "debian-openssl-1.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(CUSTOMER)
+  phone     String   @default("")
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  isFraud   Boolean  @default(false)
+  orders    Order[]
+  reviews   Review[]
+  cart      Cart?
+}
+
+model Category {
+  id           String    @id @default(cuid())
+  name         String
+  slug         String    @unique
+  description  String @db.Text
+  image        String
+  icon         String?
+  productCount Int       @default(0)
+  isActive     Boolean   @default(true)
+  isFeatured   Boolean   @default(false)
+  order        Int       @default(0)
+  products     Product[]
+  subcategories Subcategory[]
+}
+
+model Subcategory {
+  id           String    @id @default(cuid())
+  categoryId   String
+  category     Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name         String
+  slug         String    @unique
+  isActive     Boolean   @default(true)
+  isFeatured   Boolean   @default(false)
+}
+
+model Product {
+  id                String           @id @default(cuid())
+  name              String
+  slug              String           @unique
+  brand             String
+  categoryId        String
+  categoryName      String
+  subcategoryId     String?
+  subcategoryName   String?
+  basePrice         Float
+  originalPrice     Float
+  discount          Float            @default(0)
+  stock             Int              @default(0)
+  sku               String           @unique
+  shortDescription String @db.Text
+  description  String @db.Text
+  features          Json
+  specifications    Json
+  images            Json
+  tags              Json
+  rating            Float            @default(0)
+  reviewCount       Int              @default(0)
+  salesCount        Int              @default(0)
+  isFeatured        Boolean          @default(false)
+  isBestSeller      Boolean          @default(false)
+  isNew             Boolean          @default(false)
+  isPublished       Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @default(now()) @updatedAt
+  seoTitle          String?
+  seoDescription String? @db.Text
+  imageAlt          String?
+  lowStockThreshold Int              @default(5)
+  orderItems        OrderItem[]
+  category          Category         @relation(fields: [categoryId], references: [id])
+  variants          ProductVariant[]
+  reviews           Review[]
+}
+
+model ProductVariant {
+  id                String  @id @default(cuid())
+  productId         String
+  sku               String  @unique
+  colorName         String
+  colorHex          String
+  size              String?
+  storage           String?
+  ram               String?
+  price             Float
+  stock             Int     @default(0)
+  lowStockThreshold Int     @default(5)
+  images            Json
+  product           Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Banner {
+  id          String     @id @default(cuid())
+  title       String
+  subtitle    String
+  badge       String
+  description  String @db.Text
+  price       Float
+  discount    Float      @default(0)
+  image       String
+  ctaText     String
+  ctaLink     String
+  isActive    Boolean    @default(true)
+  order       Int        @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  type        BannerType @default(HERO)
+}
+
+model Coupon {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  discountType  DiscountType
+  discountValue Float
+  minOrderValue Float        @default(0)
+  maxDiscount   Float?
+  expiryDate    DateTime
+  usageLimit    Int          @default(100)
+  usedCount     Int          @default(0)
+  isActive      Boolean      @default(true)
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  orderNumber     String        @unique
+  userId          String?
+  customerName    String
+  customerEmail   String
+  customerPhone   String
+  shippingAddress Json
+  deliveryNote    String?
+  subtotal        Float
+  discount        Float         @default(0)
+  couponCode      String?
+  shippingFee     Float         @default(0)
+  tax             Float         @default(0)
+  total           Float
+  paymentMethod   PaymentMethod @default(COD)
+  paymentStatus   PaymentStatus @default(PENDING)
+  orderStatus     OrderStatus   @default(PENDING)
+  trackingNumber  String
+  timeline        Json
+  createdAt       DateTime      @default(now())
+  user            User?         @relation(fields: [userId], references: [id])
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  productId      String
+  productName    String
+  productSlug    String
+  productImage   String
+  variantId      String?
+  variantSku     String?
+  variantColor   String?
+  variantSize    String?
+  variantStorage String?
+  price          Float
+  quantity       Int
+  total          Float
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product @relation(fields: [productId], references: [id])
+}
+
+model Review {
+  id                 String   @id @default(cuid())
+  productId          String
+  userId             String?
+  customerName       String
+  customerAvatar     String?
+  rating             Int
+  title              String
+  comment String @db.Text
+  images             Json
+  isVerifiedPurchase Boolean  @default(false)
+  isApproved         Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  product            Product  @relation(fields: [productId], references: [id])
+  user               User?    @relation(fields: [userId], references: [id])
+}
+
+model Settings {
+  id                      Int    @id @default(autoincrement())
+  storeName               String @default("BdNeeds")
+  currency                String @default("BDT")
+  freeShippingThreshold   Float  @default(5000)
+  taxRate                 Float  @default(0)
+  contactEmail            String @default("contact@bdneeds.com")
+  contactPhone            String @default("01811277828")
+  shippingFeeInsideDhaka  Float  @default(70)
+  shippingFeeOutsideDhaka Float  @default(130)
+}
+
+model RecycleBin {
+  id           String   @id @default(cuid())
+  entityType   String
+  entityId     String
+  entityTitle  String
+  originalData Json
+  deletedAt    DateTime @default(now())
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  MODERATOR
+}
+
+enum BannerType {
+  HERO
+  CAMPAIGN
+  ANNOUNCEMENT
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PaymentMethod {
+  COD
+  CARD
+  BKASH
+  NAGAD
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  variantId String?
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId, variantId])
+}
