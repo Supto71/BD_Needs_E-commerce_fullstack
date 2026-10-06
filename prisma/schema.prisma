@@ -157,6 +157,9 @@ model Order {
   createdAt       DateTime      @default(now())
   user            User?         @relation(fields: [userId], references: [id])
   items           OrderItem[]
+  uddoktaInvoiceId     String?       @unique
+  uddoktaTransactionId String?
+  paymentDetails       Json?
 }
 
 model OrderItem {
@@ -278,4 +281,14 @@ model CartItem {
   updatedAt DateTime @updatedAt
 
   @@unique([cartId, productId, variantId])
+}
+
+model PasswordResetOTP {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
 }

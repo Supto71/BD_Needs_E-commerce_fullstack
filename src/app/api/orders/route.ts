@@ -126,11 +126,17 @@ export async function POST(request: Request) {
           });
 
           const upData = await upRes.json();
+          console.log("UddoktaPay Response:", upData);
+
           if (upData.status && upData.payment_url) {
             return NextResponse.json({ ...order, paymentUrl: upData.payment_url }, { status: 201 });
+          } else {
+            console.error('UddoktaPay API Error:', upData);
+            return NextResponse.json({ error: 'Payment gateway error', details: upData }, { status: 400 });
           }
         } catch (err) {
           console.error('UddoktaPay creation error:', err);
+          return NextResponse.json({ error: 'Failed to connect to payment gateway' }, { status: 500 });
         }
       }
     }

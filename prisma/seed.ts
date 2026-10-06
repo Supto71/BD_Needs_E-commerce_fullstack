@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, INITIAL_BANNERS, INITIAL_COUPONS, INITIAL_REVIEWS, INITIAL_ORDERS, INITIAL_USERS } from '../src/lib/seed-data';
 
 // Always load .env from the project root folder (the parent of /prisma),
@@ -66,12 +67,15 @@ async function main() {
 
   // Users
   for (const user of INITIAL_USERS) {
+    const rawPassword = user.password || 'password';
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    
     await prisma.user.create({
       data: {
         id: user.id,
         name: user.name,
         email: user.email,
-        password: user.password || 'password',
+        password: hashedPassword,
         role: user.role === 'ADMIN' ? 'ADMIN' : 'CUSTOMER',
         avatarUrl: user.avatarUrl,
         createdAt: user.createdAt ? new Date(user.createdAt) : undefined,
