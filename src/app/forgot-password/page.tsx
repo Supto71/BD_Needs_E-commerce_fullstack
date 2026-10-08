@@ -19,6 +19,7 @@ export default function ForgotPasswordPage() {
   
   // Step 3: New Password
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
@@ -54,18 +55,42 @@ export default function ForgotPasswordPage() {
     }
   };
   
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp.trim()) return;
     
+    setLoading(true);
     setError('');
-    // We verify OTP along with the new password in step 3
-    setStep(3);
+    
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Invalid OTP');
+      }
+      
+      setStep(3);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
   
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassword.trim()) return;
+    if (!newPassword.trim() || !confirmPassword.trim()) return;
+    
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
     
     if (newPassword.length < 6) {
       setError('Password must be at least 6 characters');
@@ -91,7 +116,7 @@ export default function ForgotPasswordPage() {
       setSuccess(data.message);
       // Wait for a few seconds before redirecting
       setTimeout(() => {
-        router.push('/login');
+        window.location.href = '/login';
       }, 2000);
     } catch (err: any) {
       setError(err.message);
@@ -135,12 +160,18 @@ export default function ForgotPasswordPage() {
           )}
 
           {success && step === 3 && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2 text-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+            <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-4 text-center">
+              <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
               <h3 className="text-sm font-bold text-emerald-950">Password Reset Successful</h3>
               <p className="text-xs text-emerald-800 leading-relaxed">
                 Your password has been changed successfully. Redirecting to login...
               </p>
+              <button 
+                onClick={() => window.location.href = '/login'}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-[#ffffff] rounded-xl text-xs font-bold transition-colors shadow-sm"
+              >
+                Go to Login Page Now
+              </button>
             </div>
           )}
 
@@ -187,7 +218,7 @@ export default function ForgotPasswordPage() {
                     maxLength={6}
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
+                    placeholder="e.g. 648291"
                     className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20 tracking-widest"
                   />
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -196,10 +227,11 @@ export default function ForgotPasswordPage() {
 
               <button
                 type="submit"
-                className="w-full py-3.5 bg-[#0B132B] hover:bg-blue-600 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                disabled={loading}
+                className="w-full py-3.5 bg-[#0B132B] hover:bg-blue-600 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
               >
-                Verify OTP
-                <ArrowRight className="w-4 h-4" />
+                {loading ? 'Verifying...' : 'Verify OTP'}
+                {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
               
               <div className="text-center">
@@ -228,6 +260,24 @@ export default function ForgotPasswordPage() {
                     minLength={6}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+                  />
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
                   />
