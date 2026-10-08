@@ -8,6 +8,7 @@ import CampaignBanner from '@/components/storefront/CampaignBanner';
 import NewArrivalsSection from '@/components/storefront/NewArrivalsSection';
 import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
+import SeoDirectory from '@/components/storefront/SeoDirectory';
 import { getBanners, getCategories, getProducts } from '@/lib/db';
 import { SITE_URL, SITE_NAME } from '@/lib/site';
 
@@ -81,6 +82,7 @@ export default async function HomePage() {
 
       </main>
 
+      <SeoDirectory />
       <Footer />
       <MobileBottomNav />
     </div>
