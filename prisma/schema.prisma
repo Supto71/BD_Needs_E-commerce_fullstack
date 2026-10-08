@@ -204,7 +204,7 @@ model Settings {
   currency                String @default("BDT")
   freeShippingThreshold   Float  @default(5000)
   taxRate                 Float  @default(0)
-  contactEmail            String @default("contact@bdneeds.com")
+  contactEmail            String @default("contact@bdneeds.com.bd")
   contactPhone            String @default("01811277828")
   shippingFeeInsideDhaka  Float  @default(70)
   shippingFeeOutsideDhaka Float  @default(130)
@@ -291,4 +291,14 @@ model PasswordResetOTP {
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }

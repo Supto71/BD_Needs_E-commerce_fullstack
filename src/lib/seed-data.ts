@@ -1244,7 +1244,7 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'usr-admin-1',
     name: 'bdneeds Executive Admin',
-    email: 'admin@bdneeds.com',
+    email: 'admin@bdneeds.com.bd',
     password: 'admin123',
     role: 'ADMIN',
     phone: '+1 (555) 000-1111',

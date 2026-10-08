@@ -77,7 +77,7 @@ export default function AdminHeader({ onMenuClick }: { onMenuClick?: () => void 
               {user?.name || 'Administrator'}
             </span>
             <span className="text-[10px] text-slate-400 block leading-tight">
-              {user?.email || 'admin@bdneeds.com'}
+              {user?.email || 'admin@bdneeds.com.bd'}
             </span>
           </div>
 

@@ -9,15 +9,34 @@ import MobileBottomNav from '@/components/storefront/MobileBottomNav';
 
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && email && message) {
-      setSent(true);
+    if (!name || !email || !message) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, subject, message }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSent(true);
+      } else {
+        setError('কিছু সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      }
+    } catch {
+      setError('কিছু সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -54,7 +73,7 @@ export default function ContactPage() {
                     <MapPin className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div>
                       <strong className="text-[#ffffff] block mb-0.5">সদর দফতর</strong>
-                      ৪৫, গুলশান এভিনিউ, গুলশান-২<br />
+                      খিলবাড়িরটেক, ভাটারা<br />
                       ঢাকা – ১২১২, বাংলাদেশ
                     </div>
                   </div>
@@ -63,8 +82,7 @@ export default function ContactPage() {
                     <Phone className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div>
                       <strong className="text-[#ffffff] block mb-0.5">ফোন / হোয়াটসঅ্যাপ</strong>
-                      +880 1700-000000<br />
-                      +880 1800-000000
+                      +880 1811-277828
                     </div>
                   </div>
 
@@ -72,8 +90,7 @@ export default function ContactPage() {
                     <Mail className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div>
                       <strong className="text-[#ffffff] block mb-0.5">ইমেইল</strong>
-                      support@bdneeds.com<br />
-                      info@bdneeds.com
+                      support@bdneeds.com.bd
                     </div>
                   </div>
 
@@ -169,12 +186,16 @@ export default function ContactPage() {
                     />
                   </div>
 
+                  {error && (
+                    <p className="text-xs text-red-600 font-semibold">{error}</p>
+                  )}
                   <button
                     type="submit"
-                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm"
+                    disabled={loading}
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm"
                   >
                     <Send className="w-4 h-4" />
-                    মেসেজ পাঠান
+                    {loading ? 'পাঠানো হচ্ছে...' : 'মেসেজ পাঠান'}
                   </button>
                 </form>
               )}

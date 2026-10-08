@@ -30,7 +30,7 @@ export default function POSReceiptPage(props: { params: Promise<{ id: string }> 
     return <div className="p-8 text-center text-sm font-semibold text-red-500">Order not found.</div>;
   }
 
-  const invoiceUrl = typeof window !== 'undefined' ? `${window.location.origin}/invoice/${order.id}` : `https://bdneeds.com/invoice/${order.id}`;
+  const qrUrl = typeof window !== 'undefined' ? window.location.origin : 'https://bdneeds.com.bd';
 
   return (
     <div className="min-h-screen bg-slate-100 py-8 px-4 font-mono text-slate-900 flex justify-center print:bg-white print:p-0 print:py-0">
@@ -135,12 +135,12 @@ export default function POSReceiptPage(props: { params: Promise<{ id: string }> 
 
         {/* QR Code & Footer */}
         <div className="text-center flex flex-col items-center">
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">Scan for detailed invoice</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-3">Scan to visit our website</p>
           <div className="bg-white p-2 rounded-lg border border-slate-200 inline-block">
-            <QRCodeSVG value={invoiceUrl} size={100} level="M" />
+            <QRCodeSVG value={qrUrl} size={100} level="M" />
           </div>
           <p className="text-[10px] text-slate-400 mt-4">Thank you for shopping with us!</p>
-          <p className="text-[10px] text-slate-400">bdneeds.com</p>
+          <p className="text-[10px] text-slate-400">bdneeds.com.bd</p>
         </div>
 
       </div>

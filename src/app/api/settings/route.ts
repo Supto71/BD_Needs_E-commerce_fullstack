@@ -17,7 +17,7 @@ export async function GET() {
           shippingFeeOutsideDhaka: 130,
           freeShippingThreshold: 5000,
           taxRate: 0,
-          contactEmail: 'contact@bdneeds.com',
+          contactEmail: 'contact@bdneeds.com.bd',
           contactPhone: '01811277828'
         }
       });
@@ -43,7 +43,7 @@ export async function PUT(request: Request) {
           shippingFeeOutsideDhaka: 130,
           freeShippingThreshold: 5000,
           taxRate: 0,
-          contactEmail: 'contact@bdneeds.com',
+          contactEmail: 'contact@bdneeds.com.bd',
           contactPhone: '01811277828'
         }
       });

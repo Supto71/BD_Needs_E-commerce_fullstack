@@ -289,7 +289,7 @@ export default function AdminCustomersPage() {
                     }`}>
                       {admin.role}
                     </span>
-                    {admin.email !== 'admin@bdneeds.com' && (
+                    {admin.email !== 'admin@bdneeds.com.bd' && (
                       <button 
                         onClick={() => handleDeleteClient(admin.id)}
                         className="px-2 py-1 text-[10px] font-bold bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"

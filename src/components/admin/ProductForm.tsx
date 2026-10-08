@@ -376,7 +376,7 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-1.5">Google preview</p>
                 <p className="text-[#1a0dab] text-base leading-tight truncate">{(seoTitle || `${name || 'Product Name'} Price in Bangladesh`)} | BDNEEDS</p>
-                <p className="text-[12px] text-emerald-700 mt-0.5">bdneeds.com › product › {name ? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') : 'slug'}</p>
+                <p className="text-[12px] text-emerald-700 mt-0.5">bdneeds.com.bd › product › {name ? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') : 'slug'}</p>
                 <p className="text-[12px] text-slate-600 mt-0.5 line-clamp-2">{seoDescription || shortDescription || 'Description auto-generate hobe.'}</p>
               </div>
             </div>

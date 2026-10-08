@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Save, CheckCircle2, Store, DollarSign, Truck, ShieldCheck, Globe } from 'lucide-react';
+import { Save, CheckCircle2, Store, Truck, Globe, Mail, Phone, Eye, EyeOff, Clock } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AdminSettingsPage() {
@@ -12,9 +12,14 @@ export default function AdminSettingsPage() {
   const [shippingFeeOutsideDhaka, setShippingFeeOutsideDhaka] = useState('130');
   const [freeShippingThreshold, setFreeShippingThreshold] = useState('5000');
   const [taxRate, setTaxRate] = useState('0');
-  const [contactEmail, setContactEmail] = useState('contact@bdneeds.com');
+  const [contactEmail, setContactEmail] = useState('contact@bdneeds.com.bd');
   const [contactPhone, setContactPhone] = useState('01811277828');
   const [saved, setSaved] = useState(false);
+
+  // Contact Messages State
+  const [messages, setMessages] = useState<any[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(true);
+  const [expandedMsg, setExpandedMsg] = useState<string | null>(null);
 
   // Announcement Bar State
   const [announcementId, setAnnouncementId] = useState<string | null>(null);
@@ -50,12 +55,30 @@ export default function AdminSettingsPage() {
           setShippingFeeOutsideDhaka(data.shippingFeeOutsideDhaka?.toString() || '130');
           setFreeShippingThreshold(data.freeShippingThreshold?.toString() || '5000');
           setTaxRate(data.taxRate?.toString() || '0');
-          setContactEmail(data.contactEmail || 'contact@bdneeds.com');
+          setContactEmail(data.contactEmail || 'contact@bdneeds.com.bd');
           setContactPhone(data.contactPhone || '01811277828');
         }
       })
       .catch(console.error);
+
+    // Fetch contact messages
+    fetch('/api/contact')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setMessages(data);
+      })
+      .catch(console.error)
+      .finally(() => setMessagesLoading(false));
   }, []);
+
+  const handleMarkRead = async (id: string, isRead: boolean) => {
+    await fetch('/api/contact', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, isRead }),
+    });
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead } : m));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,6 +339,85 @@ export default function AdminSettingsPage() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Contact Messages */}
+        <div className="bg-[#ffffff] rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-[#0B132B] flex items-center gap-2">
+              <Mail className="w-4 h-4 text-blue-600" />
+              Contact Messages
+              {messages.filter(m => !m.isRead).length > 0 && (
+                <span className="ml-1 px-2 py-0.5 bg-blue-600 text-[#ffffff] text-[10px] font-bold rounded-full">
+                  {messages.filter(m => !m.isRead).length} new
+                </span>
+              )}
+            </h3>
+            <span className="text-xs text-slate-400">{messages.length} total</span>
+          </div>
+
+          {messagesLoading ? (
+            <p className="text-xs text-slate-400 py-4 text-center">Loading messages...</p>
+          ) : messages.length === 0 ? (
+            <p className="text-xs text-slate-400 py-4 text-center">No contact messages yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`rounded-2xl border p-4 transition-all ${
+                    msg.isRead ? 'border-slate-100 bg-slate-50' : 'border-blue-100 bg-blue-50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {!msg.isRead && (
+                          <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                        )}
+                        <span className="text-xs font-bold text-[#0B132B]">{msg.name}</span>
+                        <span className="text-xs text-slate-500">&lt;{msg.email}&gt;</span>
+                      </div>
+                      {msg.subject && (
+                        <p className="text-xs font-semibold text-slate-700 mt-1">{msg.subject}</p>
+                      )}
+                      <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400">
+                        <Clock className="w-3 h-3" />
+                        {new Date(msg.createdAt).toLocaleString('en-BD', { timeZone: 'Asia/Dhaka' })}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setExpandedMsg(expandedMsg === msg.id ? null : msg.id)}
+                        className="text-[10px] font-bold text-blue-600 hover:underline"
+                      >
+                        {expandedMsg === msg.id ? 'Hide' : 'View'}
+                      </button>
+                      <button
+                        onClick={() => handleMarkRead(msg.id, !msg.isRead)}
+                        title={msg.isRead ? 'Mark as unread' : 'Mark as read'}
+                        className="text-slate-400 hover:text-blue-600 transition-colors"
+                      >
+                        {msg.isRead ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {expandedMsg === msg.id && (
+                    <div className="mt-3 pt-3 border-t border-slate-200">
+                      <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                      <a
+                        href={`mailto:${msg.email}`}
+                        className="inline-flex items-center gap-1 mt-3 text-[10px] font-bold text-blue-600 hover:underline"
+                      >
+                        <Mail className="w-3 h-3" /> Reply via Email
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end">
