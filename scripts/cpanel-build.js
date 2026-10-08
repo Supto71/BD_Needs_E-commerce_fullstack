@@ -159,6 +159,50 @@ try {
   process.exit(1);
 }
 
+// 6c. Inject automatic .env loader into standalone server.js
+console.log('\n> Injecting .env auto-loader into standalone server.js...');
+const envLoaderCode = `// --- Auto-load .env on cPanel ---
+try {
+  const _fs = require('fs');
+  const _path = require('path');
+  const _envFile = _path.resolve(__dirname, '.env');
+  if (_fs.existsSync(_envFile)) {
+    const _lines = _fs.readFileSync(_envFile, 'utf8').split(/\\r?\\n/);
+    for (const _l of _lines) {
+      const _trimmed = _l.trim();
+      if (!_trimmed || _trimmed.startsWith('#')) continue;
+      const _eq = _trimmed.indexOf('=');
+      if (_eq > 0) {
+        const _k = _trimmed.slice(0, _eq).trim();
+        let _v = _trimmed.slice(_eq + 1).trim();
+        if ((_v.startsWith('"') && _v.endsWith('"')) || (_v.startsWith("'") && _v.endsWith("'"))) {
+          _v = _v.slice(1, -1);
+        }
+        if (!process.env[_k]) {
+          process.env[_k] = _v;
+        }
+      }
+    }
+  }
+} catch (e) {
+  console.error('[Warning] Failed to parse .env file:', e);
+}
+// ---------------------------------
+`;
+
+const serverTargets = [path.join(standaloneDir, 'server.js')];
+if (fs.existsSync(subFrontendDir)) {
+  serverTargets.push(path.join(subFrontendDir, 'server.js'));
+}
+for (const sPath of serverTargets) {
+  if (fs.existsSync(sPath)) {
+    const orig = fs.readFileSync(sPath, 'utf8');
+    if (!orig.includes('Auto-load .env on cPanel')) {
+      fs.writeFileSync(sPath, envLoaderCode + orig);
+    }
+  }
+}
+
 // 7. Copy sample .env to standalone
 const sampleEnv = path.join(rootDir, '.env.example');
 if (fs.existsSync(sampleEnv)) {

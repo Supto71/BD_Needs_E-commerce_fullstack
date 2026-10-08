@@ -100,7 +100,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Forgot password error:", error);
     return NextResponse.json(
-      { message: "Failed to send OTP. Please try again later." },
+      { message: error?.message || "Failed to send OTP. Please try again later." },
       { status: 500 }
     );
   }

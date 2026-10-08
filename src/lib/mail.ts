@@ -27,15 +27,13 @@ export async function sendMail({ to, subject, html, text, from }: SendEmailOptio
       });
 
       if (error) {
-        console.error('[Resend Error]:', error);
-        throw new Error(error.message);
+        console.warn('[Resend Warning]:', error.message, '- Attempting SMTP fallback...');
+      } else {
+        console.log('[Resend Success]: Email sent with ID:', data?.id);
+        return { success: true, id: data?.id, provider: 'resend' };
       }
-
-      console.log('[Resend Success]: Email sent with ID:', data?.id);
-      return { success: true, id: data?.id, provider: 'resend' };
     } catch (err: any) {
-      console.error('[Resend Exception]:', err.message);
-      throw err;
+      console.warn('[Resend Exception]:', err.message, '- Attempting SMTP fallback...');
     }
   }
 
