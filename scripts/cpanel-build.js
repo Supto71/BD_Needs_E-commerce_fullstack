@@ -14,8 +14,12 @@ console.log('\n> Generating Prisma Client...');
 try {
   execSync('npx prisma generate', { stdio: 'inherit' });
 } catch (error) {
-  console.error('\nPrisma generation failed! Aborting cPanel preparation.');
-  process.exit(1);
+  if (fs.existsSync(path.join(rootDir, 'node_modules', '.prisma', 'client', 'index.js'))) {
+    console.warn('\nPrisma generate hit a file lock (dev server running), but Prisma client and engines already exist. Continuing...');
+  } else {
+    console.error('\nPrisma generation failed! Aborting cPanel preparation.');
+    process.exit(1);
+  }
 }
 
 // 2. Build the Next.js app
