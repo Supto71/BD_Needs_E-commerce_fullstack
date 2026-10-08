@@ -129,7 +129,7 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>contact@bdneeds.com.bd</span>
+                <span>support@bdneeds.com.bd</span>
               </div>
               <div className="flex items-start gap-2">
                 <Clock className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
