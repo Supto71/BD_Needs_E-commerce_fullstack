@@ -5,7 +5,7 @@ import Header from '@/components/storefront/Header';
 import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
 import ShopCatalog from '@/components/storefront/ShopCatalog';
-import CategorySeoBlock from '@/components/storefront/CategorySeoBlock';
+import SeoContentBlock from '@/components/storefront/SeoContentBlock';
 import { getProducts, getCategories, getCategoryBySlug } from '@/lib/db';
 import { SITE_URL } from '@/lib/site';
 import { breadcrumbJsonLd } from '@/lib/seo';
@@ -69,7 +69,9 @@ export default async function CategoryPage(props: {
           />
         </Suspense>
       </main>
-      <CategorySeoBlock categoryName={category.name} />
+      
+      <SeoContentBlock pageType="category" categoryName={category.name} />
+
       <Footer />
       <MobileBottomNav />
     </div>

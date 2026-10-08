@@ -4,6 +4,7 @@ import Header from '@/components/storefront/Header';
 import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
 import ShopCatalog from '@/components/storefront/ShopCatalog';
+import SeoContentBlock from '@/components/storefront/SeoContentBlock';
 import { getProducts, getCategories } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,7 @@ export default async function NewArrivalsPage() {
           />
         </Suspense>
       </main>
+      <SeoContentBlock pageType="new-arrivals" />
       <Footer />
       <MobileBottomNav />
     </div>
