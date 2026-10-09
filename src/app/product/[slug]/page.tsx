@@ -30,10 +30,10 @@ export async function generateMetadata(props: {
   return {
     title: { absolute: fullTitle },
     description: seo.description,
-    alternates: { canonical: `/product/${slug}` },
+    alternates: { canonical: `${SITE_URL}/product/${slug}` },
     openGraph: {
       type: 'website',
-      url: `/product/${slug}`,
+      url: `${SITE_URL}/product/${slug}`,
       title: fullTitle,
       description: seo.description,
       images: ((product.images as string[]) || [])
