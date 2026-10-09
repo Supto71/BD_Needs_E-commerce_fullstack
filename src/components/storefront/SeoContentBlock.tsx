@@ -18,47 +18,47 @@ export default function SeoContentBlock({ pageType, categoryName }: SeoContentBl
     home: {
       en: [
         {
-          title: "Why BDNeeds is the Ultimate Online Shopping Destination in Bangladesh",
+          title: "Why BDNeeds is the Best Online Shopping Destination in Bangladesh",
           blocks: [
-            "BDNeeds stands out as a leading e-commerce platform in Bangladesh, offering an unparalleled online shopping experience. Whether you're looking for the latest electronics, trendy fashion apparel, reliable home appliances, or daily groceries, our extensive catalog has it all. We continuously update our inventory to ensure you have access to the most sought-after products in the market.",
-            "Our user-friendly interface allows you to navigate effortlessly through thousands of items, compare prices, and read genuine customer reviews. We aim to bridge the gap between premium global brands and Bangladeshi consumers, bringing the world’s best products right to your fingertips."
+            "BDNeeds is rapidly emerging as a top-tier e-commerce platform in Bangladesh, offering a seamless online shopping experience for regular shoppers. Whether you're hunting for the latest smart gadgets, trendy clothing, or essential stationary items, our extensive catalog is built to serve your daily lifestyle needs at the best prices.",
+            "Our user-friendly platform allows you to compare prices, read genuine customer reviews, and securely place orders. We aim to bridge the gap between premium products and Bangladeshi consumers by delivering reliable, high-quality items straight to your doorstep."
           ]
         },
         {
-          title: "100% Authentic Products & Trusted Brands",
+          title: "100% Authentic Gadgets, Clothing & Lifestyle Products",
           blocks: [
-            "In an era where counterfeit goods are a major concern, BDNeeds guarantees 100% authenticity. We source our inventory directly from authorized distributors and official brand partners. This rigorous quality control ensures that every item you purchase—be it a high-end smartphone or a daily skincare product—is genuine and safe to use.",
-            "By maintaining strict vendor guidelines, we protect our customers from fraudulent products and ensure that you always get the value you paid for. Trust and transparency are the pillars of our business."
+            "We know authenticity matters. That is why BDNeeds guarantees 100% genuine products across all our categories, from tech accessories to fashion apparel and stationary. We source directly from authorized distributors to ensure every item you purchase is exactly what you expect.",
+            "By maintaining strict vendor guidelines, we protect our customers from counterfeit goods. Shop with confidence knowing that trust, affordability, and transparency are the core pillars of BDNeeds."
           ]
         },
         {
-          title: "Fast Home Delivery & Hassle-Free Returns",
+          title: "Fast Home Delivery & Hassle-Free Returns in BD",
           blocks: [
-            "We understand that once you place an order, you want it delivered as quickly as possible. BDNeeds boasts a robust logistics network capable of delivering products across all 64 districts of Bangladesh. Enjoy our expedited shipping options and track your order in real-time from our dashboard.",
-            "Furthermore, your satisfaction is our priority. If you receive a defective or incorrect item, our 7-day easy return and refund policy ensures you can send it back without any hassle. Combined with our Cash on Delivery (COD) service, shopping at BDNeeds is completely risk-free."
+            "We understand that once you order a new gadget or outfit, you want it fast. BDNeeds boasts a robust logistics network capable of delivering products across all 64 districts of Bangladesh. Enjoy our expedited shipping and cash-on-delivery (COD) options for a completely risk-free experience.",
+            "Your satisfaction is our priority. If you receive a defective item, our easy 7-day return and refund policy ensures you can send it back without any hassle. Make BDNeeds your go-to online store today!"
           ]
         }
       ],
       bn: [
         {
-          title: "বিডিনিডস (BDNeeds) কেন বাংলাদেশের সেরা অনলাইন শপিং গন্তব্য?",
+          title: "বিডিনিডস (BDNeeds) কেন বাংলাদেশের সেরা অনলাইন শপিং ওয়েবসাইট?",
           blocks: [
-            "বিডিনিডস (BDNeeds) বাংলাদেশের শীর্ষস্থানীয় ই-কমার্স প্ল্যাটফর্ম হিসেবে এক অনন্য শপিং অভিজ্ঞতা প্রদান করছে। লেটেস্ট ইলেকট্রনিক্স, ট্রেন্ডি ফ্যাশন, দরকারি হোম অ্যাপ্লায়েন্স থেকে শুরু করে দৈনন্দিন গ্রোসারী—সবকিছুই পাচ্ছেন আমাদের বিশাল ক্যাটালগে। বাজারের সবচেয়ে চাহিদাপূর্ণ পণ্যগুলো গ্রাহকদের হাতে তুলে দিতে আমরা নিয়মিত আমাদের স্টক আপডেট করি।",
-            "আমাদের ওয়েবসাইটটি এমনভাবে তৈরি করা হয়েছে যেন আপনি খুব সহজেই হাজারো পণ্যের মাঝে আপনার পছন্দেরটি খুঁজে পান, দাম তুলনা করতে পারেন এবং আসল ক্রেতাদের রিভিউ পড়তে পারেন। গ্লোবাল প্রিমিয়াম ব্র্যান্ডগুলোকে সরাসরি বাংলাদেশের ক্রেতাদের হাতের নাগালে নিয়ে আসাই আমাদের মূল লক্ষ্য।"
+            "বিডিনিডস (BDNeeds) বাংলাদেশের অন্যতম বিশ্বস্ত ই-কমার্স প্ল্যাটফর্ম হিসেবে রেগুলার শপারদের দিচ্ছে এক অনন্য শপিং অভিজ্ঞতা। আপনি লেটেস্ট স্মার্ট গ্যাজেট, ট্রেন্ডি পোশাক (Clothing), নাকি দরকারি স্টেশনারি আইটেম খুঁজছেন? আমাদের সুবিশাল কালেকশনে দৈনন্দিন লাইফস্টাইলের সবকিছুই পাচ্ছেন সেরা দামে।",
+            "আমাদের সহজ ইন্টারফেস ব্যবহার করে আপনি ঘরে বসেই হাজারো পণ্যের দাম তুলনা করতে পারবেন এবং অরিজিনাল কাস্টমার রিভিউ দেখে নিশ্চিন্তে অর্ডার করতে পারবেন। সাশ্রয়ী মূল্যে সেরা মানের পণ্য বাংলাদেশের যেকোনো প্রান্তে পৌঁছে দেওয়াই আমাদের মূল লক্ষ্য।"
           ]
         },
         {
-          title: "১০০% অরিজিনাল প্রোডাক্ট এবং বিশ্বস্ত ব্র্যান্ড",
+          title: "১০০% অরিজিনাল গ্যাজেট, পোশাক এবং স্টেশনারি পণ্য",
           blocks: [
-            "বর্তমান সময়ে নকল পণ্যের ভিড়ে বিডিনিডস ১০০% অরিজিনাল পণ্যের নিশ্চয়তা দেয়। আমরা সরাসরি অনুমোদিত ডিস্ট্রিবিউটর এবং অফিসিয়াল ব্র্যান্ড পার্টনারদের কাছ থেকে পণ্য সংগ্রহ করি। এই কঠোর মান নিয়ন্ত্রণের ফলে আপনি যে পণ্যই কিনুন না কেন—তা হোক দামি স্মার্টফোন বা প্রতিদিনের স্কিনকেয়ার প্রোডাক্ট—সেটি হয় সম্পূর্ণ আসল এবং নিরাপদ।",
-            "আমাদের কড়া ভেন্ডর গাইডলাইন গ্রাহকদের প্রতারণার হাত থেকে রক্ষা করে এবং নিশ্চিত করে যে আপনি আপনার কষ্টার্জিত অর্থের সঠিক মূল্য পাচ্ছেন। বিশ্বাস ও স্বচ্ছতাই আমাদের ব্যবসার মূলভিত্তি।"
+            "অনলাইন কেনাকাটায় আসল পণ্য পাওয়াটা খুবই জরুরি। তাই বিডিনিডস ১০০% অরিজিনাল গ্যাজেট, টেক এক্সেসরিজ, ফ্যাশন এবং স্টেশনারি পণ্যের নিশ্চয়তা দেয়। আমরা সরাসরি অনুমোদিত ডিস্ট্রিবিউটরদের কাছ থেকে পণ্য সংগ্রহ করি, যাতে আপনি নিশ্চিন্তে কেনাকাটা করতে পারেন।",
+            "আমাদের কড়া ভেন্ডর গাইডলাইন আপনাকে নকল পণ্য থেকে রক্ষা করে। সাশ্রয়ী দাম, বিশ্বাস এবং স্বচ্ছতাই বিডিনিডসের ব্যবসার মূলভিত্তি।"
           ]
         },
         {
-          title: "দ্রুততম হোম ডেলিভারি এবং সহজ রিটার্ন পলিসি",
+          title: "সারাদেশে দ্রুততম হোম ডেলিভারি এবং সহজ রিটার্ন পলিসি",
           blocks: [
-            "আমরা জানি, অনলাইনে অর্ডার করার পর পণ্যটি দ্রুত হাতে পাওয়ার জন্য সবাই অধীর আগ্রহে অপেক্ষা করেন। বিডিনিডস-এর রয়েছে শক্তিশালী লজিস্টিক নেটওয়ার্ক, যা বাংলাদেশের ৬৪টি জেলায় দ্রুততম সময়ে পণ্য পৌঁছে দিতে সক্ষম। আপনি চাইলে ড্যাশবোর্ড থেকে রিয়েল-টাইমে আপনার অর্ডারের লোকেশন ট্র্যাক করতে পারবেন।",
-            "পাশাপাশি, আপনার সন্তুষ্টি আমাদের প্রধান অগ্রাধিকার। যদি কোনো কারণে ভুল বা ত্রুটিযুক্ত পণ্য আপনার হাতে পৌঁছায়, তবে আমাদের '৭ দিনের সহজ রিটার্ন পলিসি'র মাধ্যমে কোনো ঝামেলা ছাড়াই তা ফেরত দিতে পারবেন। ক্যাশ অন ডেলিভারি (COD) সুবিধার কারণে বিডিনিডস-এ কেনাকাটা করা সম্পূর্ণ ঝুঁকিমুক্ত।"
+            "আমরা জানি, অনলাইনে কোনো গ্যাজেট বা শার্ট অর্ডার করার পর সেটি দ্রুত হাতে পাওয়ার জন্য সবাই অপেক্ষা করেন। বিডিনিডস-এর শক্তিশালী লজিস্টিক নেটওয়ার্ক বাংলাদেশের ৬৪টি জেলায় দ্রুততম সময়ে পণ্য পৌঁছে দিতে সক্ষম। সাথে থাকছে ক্যাশ অন ডেলিভারি (COD) সুবিধা, যা আপনার শপিংকে করবে সম্পূর্ণ ঝুঁকিমুক্ত।",
+            "গ্রাহক সন্তুষ্টিই আমাদের প্রধান লক্ষ্য। কোনো কারণে ভুল বা ত্রুটিযুক্ত পণ্য পেলে আমাদের '৭ দিনের সহজ রিটার্ন পলিসি'র মাধ্যমে কোনো ঝামেলা ছাড়াই তা ফেরত দিতে পারবেন। আজই বিডিনিডস থেকে আপনার পছন্দের পণ্যটি অর্ডার করুন!"
           ]
         }
       ]
