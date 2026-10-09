@@ -115,7 +115,7 @@ export default function HeroCarousel({ banners }: HeroCarouselProps) {
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-4 md:py-6">
         <div
           className="relative rounded-2xl md:rounded-3xl bg-[#0B132B] text-[#ffffff] overflow-hidden shadow-xl md:shadow-2xl min-h-[175px] sm:min-h-[200px] md:min-h-[520px] flex items-center select-none"
           onTouchStart={handleTouchStart}

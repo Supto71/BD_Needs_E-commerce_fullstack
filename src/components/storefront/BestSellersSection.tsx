@@ -19,7 +19,7 @@ export default function BestSellersSection({ products }: BestSellersSectionProps
   if (bestSellers.length === 0) return null;
 
   return (
-    <section className="py-6 sm:py-8 md:py-10 bg-slate-50/50">
+    <section className="py-6 sm:py-8 md:py-6 bg-slate-50/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-4 sm:mb-6 md:mb-10 gap-3 sm:gap-4">
           <div>

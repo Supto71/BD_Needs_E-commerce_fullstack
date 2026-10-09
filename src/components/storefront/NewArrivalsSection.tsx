@@ -19,7 +19,7 @@ export default function NewArrivalsSection({ products }: NewArrivalsSectionProps
   if (displayList.length === 0) return null;
 
   return (
-    <section className="py-8 md:py-10 bg-[#ffffff] border-t border-slate-100">
+    <section className="py-6 md:py-6 bg-[#ffffff] border-t border-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
           <div>

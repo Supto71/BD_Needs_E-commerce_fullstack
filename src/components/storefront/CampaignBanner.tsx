@@ -18,7 +18,7 @@ export default function CampaignBanner({ banner }: CampaignBannerProps) {
   if (!banner) return null;
 
   return (
-    <section className="py-2 sm:py-4 md:py-8 bg-[#ffffff]">
+    <section className="py-2 sm:py-4 md:py-4 bg-[#ffffff]">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="relative rounded-2xl md:rounded-3xl bg-[#0B132B] text-[#ffffff] overflow-hidden shadow-xl md:shadow-2xl flex flex-row md:grid md:grid-cols-12 md:gap-8 items-center justify-between min-h-[175px] sm:min-h-[200px] md:min-h-[480px] py-2.5 pl-2.5 pr-4 sm:py-4 sm:pl-4 sm:pr-6 md:p-0">
           

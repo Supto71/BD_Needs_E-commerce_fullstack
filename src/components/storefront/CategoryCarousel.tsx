@@ -25,7 +25,7 @@ export default function CategoryCarousel({ categories }: CategoryCarouselProps) 
   if (!categories || categories.length === 0) return null;
 
   return (
-    <section className="py-4 sm:py-6 md:py-8 bg-[#ffffff] border-b border-slate-100">
+    <section className="py-4 sm:py-6 md:py-4 bg-[#ffffff] border-b border-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Heading with Carousel Controls */}
         <div className="flex items-end justify-between mb-3 sm:mb-4 md:mb-8">

@@ -276,7 +276,7 @@ export default function SeoContentBlock({ pageType, categoryName }: SeoContentBl
   if (!data || data.length === 0) return null;
 
   return (
-    <section className="bg-slate-50 py-8 sm:py-10 border-t border-slate-100">
+    <section className="bg-slate-50 py-6 sm:py-6 border-t border-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-12">
           {data.map((blog, idx) => (
