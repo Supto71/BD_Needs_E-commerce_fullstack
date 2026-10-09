@@ -69,7 +69,19 @@ export default function ShopCatalog({
       if (cat?.subcategories && cat.subcategories.length > 0) {
         return cat.subcategories.map((s) => s.name);
       }
+      return [];
     }
+    const set = new Set<string>();
+    categories.forEach((c) => {
+      c.subcategories?.forEach((s) => {
+        if (s.isFeatured) set.add(s.name);
+      });
+    });
+    return Array.from(set);
+  }, [categories, selectedCategory]);
+
+  const globalFeaturedSubcategories = useMemo(() => {
+    if (selectedCategory) return [];
     const set = new Set<string>();
     categories.forEach((c) => {
       c.subcategories?.forEach((s) => {
@@ -394,6 +406,25 @@ export default function ShopCatalog({
           </div>
         )}
 
+        {/* Global Featured Subcategories (Top of Shop Page) */}
+        {!selectedCategory && globalFeaturedSubcategories.length > 0 && (
+          <div className="flex flex-wrap gap-2 pb-4 pt-2 border-b border-slate-100">
+            {globalFeaturedSubcategories.map((sub) => (
+              <button
+                key={sub}
+                onClick={() => setSelectedSubcategory(selectedSubcategory === sub ? '' : sub)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                  selectedSubcategory === sub
+                    ? 'bg-blue-600 text-[#ffffff] shadow-md'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Main Layout: Sidebar Filters + Products Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 pt-4">
           {/* Desktop Filter Sidebar */}
@@ -472,7 +503,7 @@ export default function ShopCatalog({
             </div>
 
             {/* Subcategories */}
-            {subcategories.length > 0 && (
+            {subcategories.length > 0 && selectedCategory && (
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
                   Sub-Categories

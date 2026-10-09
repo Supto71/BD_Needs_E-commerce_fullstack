@@ -14,10 +14,9 @@ interface BestSellersSectionProps {
 export default function BestSellersSection({ products }: BestSellersSectionProps) {
   const { t } = useLanguage();
 
-  // Sort by salesCount
-  const bestSellers = [...products]
-    .sort((a, b) => b.salesCount - a.salesCount)
-    .slice(0, 8);
+  const bestSellers = products.filter(p => p.isBestSeller).slice(0, 8);
+
+  if (bestSellers.length === 0) return null;
 
   return (
     <section className="py-6 sm:py-8 md:py-16 bg-slate-50/50">

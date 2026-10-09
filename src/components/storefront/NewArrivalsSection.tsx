@@ -14,11 +14,9 @@ interface NewArrivalsSectionProps {
 export default function NewArrivalsSection({ products }: NewArrivalsSectionProps) {
   const { t } = useLanguage();
 
-  const newReleases = [...products]
-    .filter((p) => p.isNew)
-    .slice(0, 4);
+  const displayList = products.filter(p => p.isNew).slice(0, 8);
 
-  const displayList = newReleases.length >= 4 ? newReleases : products.slice(0, 4);
+  if (displayList.length === 0) return null;
 
   return (
     <section className="py-16 bg-[#ffffff] border-t border-slate-100">
