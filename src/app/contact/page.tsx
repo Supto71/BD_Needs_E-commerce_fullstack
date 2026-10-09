@@ -6,8 +6,10 @@ import AnnouncementBar from '@/components/storefront/AnnouncementBar';
 import Header from '@/components/storefront/Header';
 import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function ContactPage() {
+  const { t } = useLanguage();
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,10 +33,10 @@ export default function ContactPage() {
       if (data.success) {
         setSent(true);
       } else {
-        setError('কিছু সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+        setError(t('contactError'));
       }
     } catch {
-      setError('কিছু সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      setError(t('contactError'));
     } finally {
       setLoading(false);
     }
@@ -49,13 +51,13 @@ export default function ContactPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-xl mx-auto mb-12">
             <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600">
-              Client Concierge
+              {t('contactClientConcierge')}
             </span>
             <h1 className="text-3xl sm:text-4xl font-black text-[#0B132B] mt-1">
-              How May We Assist You?
+              {t('contactHowMayWeAssist')}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-2">
-              Our specialists are available 24/7 to provide technical product advisories, order assistance, or custom inquiries.
+              {t('contactAssistDesc')}
             </p>
           </div>
 
@@ -63,25 +65,25 @@ export default function ContactPage() {
             {/* Contact Details Card */}
             <div className="lg:col-span-5 space-y-6">
               <div className="bg-[#0B132B] text-[#ffffff] rounded-3xl p-8 space-y-6 shadow-md">
-                <h3 className="text-lg font-bold">Direct Channels</h3>
+                <h3 className="text-lg font-bold">{t('contactDirectChannels')}</h3>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  Reach out via any of our official touchpoints or use the inquiry form for dedicated concierge support.
+                  {t('contactDirectChannelsDesc')}
                 </p>
 
                 <div className="space-y-4 text-xs text-slate-300">
                   <div className="flex items-start gap-3">
                     <MapPin className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-[#ffffff] block mb-0.5">সদর দফতর</strong>
-                      খিলবাড়িরটেক, ভাটারা<br />
-                      ঢাকা – ১২১২, বাংলাদেশ
+                      <strong className="text-[#ffffff] block mb-0.5">{t('contactHQ')}</strong>
+                      {t('contactHQDescLine1')}<br />
+                      {t('contactHQDescLine2')}
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
                     <Phone className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-[#ffffff] block mb-0.5">ফোন / হোয়াটসঅ্যাপ</strong>
+                      <strong className="text-[#ffffff] block mb-0.5">{t('contactPhoneWA')}</strong>
                       +880 1811-277828
                     </div>
                   </div>
@@ -89,7 +91,7 @@ export default function ContactPage() {
                   <div className="flex items-start gap-3">
                     <Mail className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-[#ffffff] block mb-0.5">ইমেইল</strong>
+                      <strong className="text-[#ffffff] block mb-0.5">{t('contactEmailLabel')}</strong>
                       support@bdneeds.com.bd
                     </div>
                   </div>
@@ -97,9 +99,9 @@ export default function ContactPage() {
                   <div className="flex items-start gap-3">
                     <Clock className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="text-[#ffffff] block mb-0.5">অফিস সময়</strong>
-                      শনি – বৃহস্পতি: সকাল ৯:০০ – রাত ৯:০০<br />
-                      শুক্রবার: বন্ধ
+                      <strong className="text-[#ffffff] block mb-0.5">{t('contactOfficeHours')}</strong>
+                      {t('contactOfficeHoursDescLine1')}<br />
+                      {t('contactOfficeHoursDescLine2')}
                     </div>
                   </div>
                 </div>
@@ -108,23 +110,23 @@ export default function ContactPage() {
 
             {/* Inquiry Form */}
             <div className="lg:col-span-7 bg-[#ffffff] rounded-3xl border border-slate-200 p-8 sm:p-10 shadow-xs">
-              <h3 className="text-lg font-bold text-[#0B132B] mb-2">Send an Inquiry</h3>
+              <h3 className="text-lg font-bold text-[#0B132B] mb-2">{t('contactSendInquiry')}</h3>
               <p className="text-xs text-slate-500 mb-6">
-                Expect a response within 4 hours during standard concierge operational windows.
+                {t('contactExpectResponse')}
               </p>
 
               {sent ? (
                 <div className="py-12 text-center space-y-3">
                   <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-                  <h4 className="text-base font-bold text-[#0B132B]">Inquiry Received</h4>
+                  <h4 className="text-base font-bold text-[#0B132B]">{t('contactInquiryReceived')}</h4>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    Thank you, {name}. A client advisor has been assigned and will reply to {email} shortly.
+                    {t('contactThankYou').replace('{name}', name).replace('{email}', email)}
                   </p>
                   <button
                     onClick={() => setSent(false)}
                     className="mt-4 text-xs font-bold text-blue-600 hover:underline"
                   >
-                    Send another inquiry
+                    {t('contactSendAnother')}
                   </button>
                 </div>
               ) : (
@@ -132,21 +134,21 @@ export default function ContactPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Your Name *
+                        {t('contactYourName')}
                       </label>
                       <input
                         type="text"
                         required
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="যেমন: রাহেলা বেগম"
+                        placeholder={t('contactYourNamePH')}
                         className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Email Address *
+                        {t('contactEmailAddress')}
                       </label>
                       <input
                         type="email"
@@ -161,27 +163,27 @@ export default function ContactPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Subject
+                      {t('contactSubject')}
                     </label>
                     <input
                       type="text"
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      placeholder="যেমন: অর্ডার সংক্রান্ত সমস্যা, পণ্য ফেরত, অথবা অন্য কোনো বিষয়"
+                      placeholder={t('contactSubjectPH')}
                       className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Message *
+                      {t('contactMessage')}
                     </label>
                     <textarea
                       required
                       rows={5}
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      placeholder="আপনার বার্তা বা সমস্যার বিস্তারিত লিখুন..."
+                      placeholder={t('contactMessagePH')}
                       className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
                     />
                   </div>
@@ -195,7 +197,7 @@ export default function ContactPage() {
                     className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm"
                   >
                     <Send className="w-4 h-4" />
-                    {loading ? 'পাঠানো হচ্ছে...' : 'মেসেজ পাঠান'}
+                    {loading ? t('contactSendingBtn') : t('contactSendBtn')}
                   </button>
                 </form>
               )}
