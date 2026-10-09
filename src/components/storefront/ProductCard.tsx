@@ -188,12 +188,12 @@ export default function ProductCard({ product }: ProductCardProps) {
 
           {/* Price & Mobile Add Button */}
           <div className="flex items-center justify-between">
-            <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2">
+            <div className="flex flex-col">
               <span className="text-[13px] sm:text-lg font-extrabold text-[#0B132B]">
                 {formatPrice(displayPrice)}
               </span>
               {originalPrice > displayPrice && (
-                <span className="text-[11px] sm:text-xs text-slate-400 line-through font-medium mt-0.5 sm:mt-0">
+                <span className="text-[11px] sm:text-xs text-slate-400 line-through font-medium mt-0.5">
                   {formatPrice(originalPrice)}
                 </span>
               )}
