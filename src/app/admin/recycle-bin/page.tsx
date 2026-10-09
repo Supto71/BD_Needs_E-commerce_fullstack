@@ -61,13 +61,43 @@ export default function RecycleBinPage() {
     }
   };
 
+  const handleEmptyRecycleBin = async () => {
+    if (items.length === 0) return;
+    if (!confirm('Are you sure you want to permanently empty the entire recycle bin? This action cannot be undone!')) return;
+    
+    setMessage({ text: '', type: '' });
+    try {
+      const res = await fetch('/api/recycle-bin?empty=true', { method: 'DELETE' });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        setMessage({ text: 'Recycle bin emptied successfully!', type: 'success' });
+        setItems([]);
+      } else {
+        setMessage({ text: data.error || 'Failed to empty recycle bin.', type: 'error' });
+      }
+    } catch (e) {
+      setMessage({ text: 'An error occurred while emptying the recycle bin.', type: 'error' });
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-[#0B132B]">Recycle Bin</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Items deleted from the admin dashboard are kept here. You can restore them or permanently delete them.
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-[#0B132B]">Recycle Bin</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Items deleted from the admin dashboard are kept here. You can restore them or permanently delete them.
+          </p>
+        </div>
+        <button
+          onClick={handleEmptyRecycleBin}
+          disabled={items.length === 0 || loading}
+          className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-rose-200"
+        >
+          <Trash2 className="w-4 h-4" />
+          Empty Recycle Bin
+        </button>
       </div>
 
       {message.text && (
