@@ -14,12 +14,12 @@ interface BestSellersSectionProps {
 export default function BestSellersSection({ products }: BestSellersSectionProps) {
   const { t } = useLanguage();
 
-  const bestSellers = products.filter(p => p.isBestSeller).slice(0, 8);
+  const bestSellers = products.filter(p => p.isBestSeller).slice(0, 10);
 
   if (bestSellers.length === 0) return null;
 
   return (
-    <section className="py-6 sm:py-8 md:py-16 bg-slate-50/50">
+    <section className="py-6 sm:py-8 md:py-10 bg-slate-50/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-4 sm:mb-6 md:mb-10 gap-3 sm:gap-4">
           <div>
@@ -46,8 +46,10 @@ export default function BestSellersSection({ products }: BestSellersSectionProps
 
         {/* Product Grid */}
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-6">
-          {bestSellers.map((product) => (
-            <ProductCard key={product.id} product={product} />
+          {bestSellers.map((product, idx) => (
+            <div key={product.id} className={idx === 9 ? 'hidden lg:block' : ''}>
+              <ProductCard product={product} />
+            </div>
           ))}
         </div>
       </div>

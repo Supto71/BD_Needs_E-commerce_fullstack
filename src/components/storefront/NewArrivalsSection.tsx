@@ -14,12 +14,12 @@ interface NewArrivalsSectionProps {
 export default function NewArrivalsSection({ products }: NewArrivalsSectionProps) {
   const { t } = useLanguage();
 
-  const displayList = products.filter(p => p.isNew).slice(0, 8);
+  const displayList = products.filter(p => p.isNew).slice(0, 10);
 
   if (displayList.length === 0) return null;
 
   return (
-    <section className="py-16 bg-[#ffffff] border-t border-slate-100">
+    <section className="py-8 md:py-10 bg-[#ffffff] border-t border-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
           <div>
@@ -45,8 +45,10 @@ export default function NewArrivalsSection({ products }: NewArrivalsSectionProps
         </div>
 
         <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-6">
-          {displayList.map((product) => (
-            <ProductCard key={product.id} product={product} />
+          {displayList.map((product, idx) => (
+            <div key={product.id} className={idx === 9 ? 'hidden lg:block' : ''}>
+              <ProductCard product={product} />
+            </div>
           ))}
         </div>
       </div>
