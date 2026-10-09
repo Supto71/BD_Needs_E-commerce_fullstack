@@ -11,24 +11,32 @@ export default function CurationsPage() {
   const { t } = useLanguage();
   const { isAdmin } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
 
-  const fetchProducts = () => {
+  const fetchData = async () => {
     setLoading(true);
-    fetch('/api/products?admin=true')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setProducts(data);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const [prodRes, catRes] = await Promise.all([
+        fetch('/api/products?admin=true'),
+        fetch('/api/categories?admin=true')
+      ]);
+      const prodData = await prodRes.json();
+      const catData = await catRes.json();
+      
+      if (Array.isArray(prodData)) setProducts(prodData);
+      if (Array.isArray(catData)) setCategories(catData);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchData();
   }, []);
 
   const toggleStatus = async (product: Product, field: 'isBestSeller' | 'isNew') => {
@@ -60,9 +68,9 @@ export default function CurationsPage() {
   };
 
   const filtered = products.filter((p) => {
-    if (!search) return true;
-    const lowerSearch = search.toLowerCase();
-    return p.name.toLowerCase().includes(lowerSearch) || p.sku.toLowerCase().includes(lowerSearch);
+    const matchSearch = search ? (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())) : true;
+    const matchCat = selectedCategory ? p.categoryId === selectedCategory : true;
+    return matchSearch && matchCat;
   });
 
   return (
@@ -77,15 +85,28 @@ export default function CurationsPage() {
       </div>
 
       <div className="bg-[#ffffff] rounded-3xl border border-slate-200 p-4 sm:p-5 shadow-xs">
-        <div className="relative w-full sm:w-96 mb-6">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('adminFilterPlaceholder')}
-            className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20 font-medium"
-          />
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="relative w-full sm:w-96">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('adminFilterPlaceholder')}
+              className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20 font-medium"
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
+          
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="w-full sm:w-64 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-600/20 font-medium cursor-pointer"
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
         </div>
 
         <div className="overflow-x-auto">
