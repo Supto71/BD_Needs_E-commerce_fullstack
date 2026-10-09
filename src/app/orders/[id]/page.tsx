@@ -58,7 +58,7 @@ export default async function OrderDetailPage(props: {
                   className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-xs"
                 >
                   <Truck className="w-4 h-4" />
-                  Live GPS Tracking
+                  Track Order
                 </Link>
               </div>
             </div>
