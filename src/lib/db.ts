@@ -448,10 +448,12 @@ export async function createOrder(input: any) {
     // Step 2: Calculate financials
     const subtotal = enrichedItems.reduce((acc, item) => acc + item.total, 0);
 
-    // Apply coupon discount
+    // Apply coupon discount (or admin discount)
     let discount = 0;
     let couponCode: string | null = null;
-    if (input.couponCode) {
+    if (input.adminDiscountPercentage !== undefined && input.adminDiscountPercentage > 0) {
+      discount = Math.round((subtotal * (input.adminDiscountPercentage / 100)) * 100) / 100;
+    } else if (input.couponCode) {
       const couponRaw = await tx.$queryRaw`SELECT * FROM \`Coupon\` WHERE code = ${input.couponCode} FOR UPDATE`;
       const couponLocked = (couponRaw as any)[0];
       if (couponLocked) {
@@ -471,16 +473,20 @@ export async function createOrder(input: any) {
     }
 
     // Fetch Store Settings for Shipping rules
-    const settings = await tx.settings.findFirst();
-    const feeInside = settings?.shippingFeeInsideDhaka ?? 70;
-    const feeOutside = settings?.shippingFeeOutsideDhaka ?? 130;
-    const freeThreshold = settings?.freeShippingThreshold ?? 5000;
-
-    // Shipping logic
-    const city: string = (input.shippingAddress?.city || '').toLowerCase();
-    const isDhaka = city === 'dhaka';
-    let shippingFee = isDhaka ? feeInside : feeOutside;
-    if (subtotal >= freeThreshold) shippingFee = 0;
+    let shippingFee = 0;
+    if (input.adminShippingFee !== undefined) {
+      shippingFee = input.adminShippingFee;
+    } else {
+      const settings = await tx.settings.findFirst();
+      const feeInside = settings?.shippingFeeInsideDhaka ?? 70;
+      const feeOutside = settings?.shippingFeeOutsideDhaka ?? 130;
+      const freeThreshold = settings?.freeShippingThreshold ?? 5000;
+      
+      const city: string = (input.shippingAddress?.city || '').toLowerCase();
+      const isDhaka = city === 'dhaka';
+      shippingFee = isDhaka ? feeInside : feeOutside;
+      if (subtotal >= freeThreshold) shippingFee = 0;
+    }
 
     const taxableAmount = Math.max(0, subtotal - discount);
     const tax = 0; // Number((taxableAmount * 0.05).toFixed(2));

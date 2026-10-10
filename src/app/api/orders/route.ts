@@ -70,6 +70,8 @@ const orderSchema = z.object({
       quantity: z.number().int().min(1, 'Quantity must be at least 1'),
     })
   ).min(1, 'Cart is empty, cannot place an empty order'),
+  adminDiscountPercentage: z.number().min(0).max(100).optional(),
+  adminShippingFee: z.number().min(0).optional(),
 });
 
 export async function POST(request: Request) {
@@ -87,6 +89,23 @@ export async function POST(request: Request) {
     
     const body = validationResult.data;
 
+    // Check auth for admin fields
+    let isAdmin = false;
+    const session = await getServerSession(authOptions);
+    let sessionUser: any = null;
+    if (session && session.user) {
+      sessionUser = (session.user as any).dbUser || session.user;
+    } else {
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get('bdneeds_session');
+      if (sessionCookie?.value) {
+        try { sessionUser = JSON.parse(decodeURIComponent(sessionCookie.value)); } catch (e) {}
+      }
+    }
+    if (sessionUser && sessionUser.role === 'ADMIN') {
+      isAdmin = true;
+    }
+
     const order = await createOrder({
       userId: body.userId,
       customerName: body.customerName,
@@ -97,6 +116,8 @@ export async function POST(request: Request) {
       items: body.items,
       couponCode: body.couponCode,
       paymentMethod: body.paymentMethod || 'COD',
+      adminDiscountPercentage: isAdmin ? body.adminDiscountPercentage : undefined,
+      adminShippingFee: isAdmin ? body.adminShippingFee : undefined,
     });
 
     if (body.paymentMethod === 'ONLINE') {
