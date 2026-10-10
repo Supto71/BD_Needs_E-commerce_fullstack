@@ -139,6 +139,13 @@ export default function AdminOrdersPage() {
           <p className="text-xs text-slate-500 mt-1">
             Track fulfillment lifecycle, inspect purchased variants, and issue courier dispatches.
           </p>
+          <Link
+            href="/admin/orders/new"
+            className="inline-flex mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors items-center gap-2"
+          >
+            <ShoppingBag className="w-4 h-4" />
+            Create New Order
+          </Link>
         </div>
         <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
           {timeFilter === 'Monthly' && (
