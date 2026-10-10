@@ -294,7 +294,7 @@ export default function AdminCustomersPage() {
                       {(isAdmin || isModerator) && (
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
                           <Link
-                            href={`/admin/orders?search=${encodeURIComponent(client.email)}`}
+                            href={`/admin/orders?clientEmail=${encodeURIComponent(client.email)}`}
                             className="px-2 py-1 flex items-center gap-1 text-[10px] font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                             title="View Orders"
                           >
