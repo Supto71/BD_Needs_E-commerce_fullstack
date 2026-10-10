@@ -103,6 +103,8 @@ export async function POST(
           } : undefined
         }
       });
+    } else if (item.entityType === 'ContactMessage') {
+      await prisma.contactMessage.create({ data: cleanData });
     } else {
       return NextResponse.json({ error: 'Unsupported entity type for restoration' }, { status: 400 });
     }
