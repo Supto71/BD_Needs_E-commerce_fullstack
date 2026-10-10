@@ -336,12 +336,26 @@ export async function getOrders(userId?: string) {
         ]
       },
       orderBy: { createdAt: 'desc' },
-      include: { items: true, user: { select: { isFraud: true } } },
+      include: { 
+        items: {
+          include: {
+            product: { select: { categoryId: true } }
+          }
+        }, 
+        user: { select: { isFraud: true } } 
+      },
     });
   }
   return prisma.order.findMany({
     orderBy: { createdAt: 'desc' },
-    include: { items: true, user: { select: { isFraud: true } } },
+    include: { 
+      items: {
+        include: {
+          product: { select: { categoryId: true } }
+        }
+      }, 
+      user: { select: { isFraud: true } } 
+    },
   });
 }
 

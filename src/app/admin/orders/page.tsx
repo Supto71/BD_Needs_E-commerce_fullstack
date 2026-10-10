@@ -16,6 +16,8 @@ export default function AdminOrdersPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear().toString());
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
 
   const isDateInRange = (dateStr: string, filter: string) => {
@@ -44,13 +46,15 @@ export default function AdminOrdersPage() {
 
   const fetchOrders = () => {
     setLoading(true);
-    fetch('/api/orders')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setOrders(data);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch('/api/orders').then(res => res.json()),
+      fetch('/api/categories?admin=true').then(res => res.json())
+    ]).then(([ordersData, catData]) => {
+      if (Array.isArray(ordersData)) setOrders(ordersData);
+      if (Array.isArray(catData)) setCategories(catData);
+    })
+    .catch(console.error)
+    .finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -74,7 +78,13 @@ export default function AdminOrdersPage() {
       }
     }
     const matchesTime = isDateInRange(o.createdAt, timeFilter);
-    return matchesSearch && matchesStatus && matchesTime;
+    
+    let matchesCategory = true;
+    if (categoryFilter) {
+      matchesCategory = o.items.some((item: any) => item.product?.categoryId === categoryFilter);
+    }
+
+    return matchesSearch && matchesStatus && matchesTime && matchesCategory;
   });
 
   const successfulOrders = filtered.filter(o => o.orderStatus === 'DELIVERED').length;
@@ -241,6 +251,17 @@ export default function AdminOrdersPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none"
+          >
+            <option value="">All Categories</option>
+            {categories.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
