@@ -104,20 +104,37 @@ export default function AdminCustomersPage() {
 
   const exportCustomerOrders = async (userId: string, email: string) => {
     try {
-      const res = await fetch(`/api/orders?userId=${userId}`);
+      const [res, catRes] = await Promise.all([
+        fetch(`/api/orders?userId=${userId}`),
+        fetch('/api/categories?admin=true')
+      ]);
       const orders = await res.json();
+      const categories = await catRes.json();
+      
+      const catMap = new Map();
+      if (Array.isArray(categories)) {
+        categories.forEach((c: any) => catMap.set(c.id, c.name));
+      }
+
       if (!orders || orders.length === 0) {
         alert('No orders found for this customer.');
         return;
       }
       
-      const headers = ['Order ID', 'Date', 'Total Amount', 'Status', 'Payment', 'Products Details'];
+      const headers = ['Order ID', 'Date', 'Customer Name', 'Customer Phone', 'Total Amount', 'Status', 'Payment', 'Products Details'];
       const csvRows = [headers.join(',')];
+      
       orders.forEach((order: any) => {
-        const itemsDetail = order.items.map((item: any) => `${item.productName} (Qty: ${item.quantity})`).join('; ');
+        const itemsDetail = order.items.map((item: any) => {
+          const categoryName = item.product?.categoryId ? (catMap.get(item.product.categoryId) || 'Uncategorized') : 'Uncategorized';
+          return `${item.productName} (Category: ${categoryName}, Qty: ${item.quantity})`;
+        }).join('; ');
+        
         const row = [
           `"${order.orderNumber}"`,
           `"${formatDate(order.createdAt)}"`,
+          `"${order.customerName}"`,
+          `"${order.customerPhone}"`,
           order.total,
           order.orderStatus,
           order.paymentMethod,
@@ -125,6 +142,7 @@ export default function AdminCustomersPage() {
         ];
         csvRows.push(row.join(','));
       });
+      
       const csvString = csvRows.join('\n');
       const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);

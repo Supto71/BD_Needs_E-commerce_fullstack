@@ -5,16 +5,13 @@ import Link from 'next/link';
 import { Search, ShoppingBag, Truck, CheckCircle2, Clock, AlertCircle, Download, FileText, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
 import { Order, OrderStatus } from '@/types';
 import { formatPrice, formatDate } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function AdminOrdersPage() {
+function OrdersContent() {
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [search, setSearch] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('search') || '';
-    }
-    return '';
-  });
+  const [search, setSearch] = useState(searchParams.get('search') || '');
   const [statusFilter, setStatusFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -402,5 +399,13 @@ export default function AdminOrdersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminOrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center text-slate-400">Loading orders...</div>}>
+      <OrdersContent />
+    </Suspense>
   );
 }
