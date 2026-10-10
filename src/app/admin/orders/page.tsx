@@ -12,6 +12,7 @@ function OrdersContent() {
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [clientEmail, setClientEmail] = useState(searchParams.get('clientEmail') || '');
   const [statusFilter, setStatusFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -65,6 +66,11 @@ function OrdersContent() {
   }, []);
 
   const filtered = orders.filter((o) => {
+    // Exact email filter takes precedence
+    if (clientEmail && o.customerEmail !== clientEmail) {
+      return false;
+    }
+
     const matchesSearch =
       !search ||
       o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
@@ -254,6 +260,17 @@ function OrdersContent() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {clientEmail && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-xl text-[10px] font-bold text-blue-700">
+              <span>Client: {clientEmail}</span>
+              <button onClick={() => {
+                setClientEmail('');
+                window.history.replaceState({}, '', '/admin/orders');
+              }} className="p-0.5 hover:bg-blue-200 rounded-md transition-colors text-blue-500">
+                <XCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
