@@ -8,6 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 export default function AdminInventoryPage() {
   const { isAdmin } = useAuth();
   const [inventory, setInventory] = useState<any[]>([]);
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -18,11 +20,13 @@ export default function AdminInventoryPage() {
 
   const fetchInventory = () => {
     setLoading(true);
-    fetch('/api/inventory')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setInventory(data);
-      })
+    Promise.all([
+      fetch('/api/inventory').then(res => res.json()),
+      fetch('/api/categories?admin=true').then(res => res.json())
+    ]).then(([invData, catData]) => {
+      if (Array.isArray(invData)) setInventory(invData);
+      if (Array.isArray(catData)) setCategories(catData);
+    })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
@@ -89,7 +93,9 @@ export default function AdminInventoryPage() {
       (item.colorName && item.colorName.toLowerCase().includes(search.toLowerCase()));
 
     const matchesLow = !filterLowStock || item.isLowStock || item.isOutOfStock;
-    return matchesSearch && matchesLow;
+    const matchesCategory = !categoryFilter || item.categoryId === categoryFilter;
+
+    return matchesSearch && matchesLow && matchesCategory;
   });
 
   return (
@@ -164,17 +170,30 @@ export default function AdminInventoryPage() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
         </div>
 
-        <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={filterLowStock}
-            onChange={(e) => setFilterLowStock(e.target.checked)}
-            className="rounded text-rose-600 focus:ring-rose-500"
-          />
-          <span className="flex items-center gap-1 text-rose-600">
-            <AlertTriangle className="w-3.5 h-3.5" /> Show Low / Out of Stock Only
-          </span>
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+          >
+            <option value="">All Categories</option>
+            {categories.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={filterLowStock}
+              onChange={(e) => setFilterLowStock(e.target.checked)}
+              className="rounded text-rose-600 focus:ring-rose-500"
+            />
+            <span className="flex items-center gap-1 text-rose-600">
+              <AlertTriangle className="w-3.5 h-3.5" /> Show Low / Out of Stock
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* Inventory Table */}

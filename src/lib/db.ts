@@ -596,6 +596,7 @@ export async function getInventoryStatus() {
         inventoryItems.push({
           productId: p.id,
           productName: p.name,
+          categoryId: p.categoryId,
           variantId: v.id,
           sku: v.sku,
           colorName: v.colorName,
@@ -610,6 +611,7 @@ export async function getInventoryStatus() {
       inventoryItems.push({
         productId: p.id,
         productName: p.name,
+        categoryId: p.categoryId,
         sku: p.sku,
         stock: p.stock,
         lowStockThreshold: p.lowStockThreshold,
