@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Save, CheckCircle2, Store, Truck, Globe, Mail, Phone, Eye, EyeOff, Clock } from 'lucide-react';
+import { Save, CheckCircle2, Store, Truck, Globe, Mail, Phone, Eye, EyeOff, Clock, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AdminSettingsPage() {
@@ -78,6 +78,20 @@ export default function AdminSettingsPage() {
       body: JSON.stringify({ id, isRead }),
     });
     setMessages(prev => prev.map(m => m.id === id ? { ...m, isRead } : m));
+  };
+
+  const handleDeleteMessage = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this message? It will be moved to the recycle bin.')) return;
+    try {
+      const res = await fetch(`/api/contact/${id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setMessages(prev => prev.filter(m => m.id !== id));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -399,6 +413,13 @@ export default function AdminSettingsPage() {
                         className="text-slate-400 hover:text-blue-600 transition-colors"
                       >
                         {msg.isRead ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        title="Delete message"
+                        className="text-slate-400 hover:text-rose-600 transition-colors ml-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
