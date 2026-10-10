@@ -8,7 +8,13 @@ import { formatPrice, formatDate } from '@/lib/utils';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('search') || '';
+    }
+    return '';
+  });
   const [statusFilter, setStatusFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState(() => {

@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Search, Users, Mail, Phone, ShoppingBag, DollarSign, Shield, Eye, EyeOff } from 'lucide-react';
+import { Search, Users, Mail, Phone, ShoppingBag, DollarSign, Shield, Eye, EyeOff, Download, ListOrdered } from 'lucide-react';
 import { formatPrice, formatDate } from '@/lib/utils';
+import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
 export default function AdminCustomersPage() {
@@ -98,6 +99,42 @@ export default function AdminCustomersPage() {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const exportCustomerOrders = async (userId: string, email: string) => {
+    try {
+      const res = await fetch(`/api/orders?userId=${userId}`);
+      const orders = await res.json();
+      if (!orders || orders.length === 0) {
+        alert('No orders found for this customer.');
+        return;
+      }
+      
+      const headers = ['Order ID', 'Date', 'Total Amount', 'Status', 'Payment', 'Products Details'];
+      const csvRows = [headers.join(',')];
+      orders.forEach((order: any) => {
+        const itemsDetail = order.items.map((item: any) => `${item.productName} (Qty: ${item.quantity})`).join('; ');
+        const row = [
+          `"${order.orderNumber}"`,
+          `"${formatDate(order.createdAt)}"`,
+          order.total,
+          order.orderStatus,
+          order.paymentMethod,
+          `"${itemsDetail.replace(/"/g, '""')}"`
+        ];
+        csvRows.push(row.join(','));
+      });
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Orders_${email}_${new Date().toLocaleDateString()}.csv`;
+      link.click();
+    } catch (error) {
+      console.error(error);
+      alert('Failed to export orders');
     }
   };
 
@@ -237,7 +274,21 @@ export default function AdminCustomersPage() {
                     </td>
                     <td className="p-4 pr-6 text-right">
                       {(isAdmin || isModerator) && (
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          <Link
+                            href={`/admin/orders?search=${encodeURIComponent(client.email)}`}
+                            className="px-2 py-1 flex items-center gap-1 text-[10px] font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                            title="View Orders"
+                          >
+                            <ListOrdered className="w-3 h-3" /> View
+                          </Link>
+                          <button
+                            onClick={() => exportCustomerOrders(client.id, client.email)}
+                            className="px-2 py-1 flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                            title="Download Orders"
+                          >
+                            <Download className="w-3 h-3" /> Save
+                          </button>
                           <button 
                             onClick={() => handleMarkFraud(client.id, client.clientTag !== 'Fraud Client')}
                             className={`px-2 py-1 text-[10px] font-bold rounded-lg transition-colors ${
