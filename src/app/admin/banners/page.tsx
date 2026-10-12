@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Plus, Edit, Trash2, CheckCircle2, XCircle, ArrowUpRight } from 'lucide-react';
+import { Plus, Edit, Trash2, CheckCircle2, XCircle, ArrowUpRight, Loader2, UploadCloud } from 'lucide-react';
 import { Banner } from '@/types';
 import { formatPrice } from '@/lib/utils';
+import { compressImage } from '@/lib/imageCompression';
 
 import { useAuth } from '@/context/AuthContext';
 
@@ -29,16 +30,23 @@ export default function AdminBannersPage() {
   const [ctaLink, setCtaLink] = useState('/shop');
   const [isActive, setIsActive] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingPreviewUrl, setUploadingPreviewUrl] = useState<string | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Immediately create local preview
+    const localPreviewUrl = URL.createObjectURL(file);
+    setUploadingPreviewUrl(localPreviewUrl);
     setUploadingImage(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
+      // Compress banner image (wider format, max 1920px)
+      const compressed = await compressImage(file, { maxWidth: 1920, maxHeight: 1080, quality: 0.82 });
+      const formData = new FormData();
+      formData.append('file', compressed);
+
       const res = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -54,6 +62,8 @@ export default function AdminBannersPage() {
       alert('Failed to upload image');
     } finally {
       setUploadingImage(false);
+      setUploadingPreviewUrl(null);
+      URL.revokeObjectURL(localPreviewUrl);
       e.target.value = '';
     }
   };
@@ -310,8 +320,18 @@ export default function AdminBannersPage() {
                       placeholder="https://images.unsplash.com/... or upload"
                       className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
                     />
-                    <label className="px-4 py-2 bg-[#0B132B] text-[#ffffff] text-xs font-bold rounded-xl hover:bg-blue-600 transition-colors cursor-pointer flex items-center justify-center">
-                      {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                    <label className="px-4 py-2 bg-[#0B132B] text-[#ffffff] text-xs font-bold rounded-xl hover:bg-blue-600 transition-colors cursor-pointer flex items-center justify-center gap-1.5 shrink-0">
+                      {uploadingImage ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud className="w-3.5 h-3.5" />
+                          <span>Upload Image</span>
+                        </>
+                      )}
                       <input
                         type="file"
                         accept="image/*"
@@ -321,6 +341,38 @@ export default function AdminBannersPage() {
                       />
                     </label>
                   </div>
+
+                  {/* Banner Image Preview */}
+                  {(uploadingPreviewUrl || image) && (
+                    <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      <div className="relative w-full h-36 rounded-lg overflow-hidden border border-slate-200 bg-slate-900 group">
+                        <img
+                          src={uploadingPreviewUrl || image}
+                          alt="Banner Preview"
+                          className="w-full h-full object-cover"
+                        />
+                        {uploadingImage && (
+                          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white gap-1">
+                            <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+                            <span className="text-xs font-bold">Optimizing & Uploading...</span>
+                          </div>
+                        )}
+                        {!uploadingImage && (
+                          <button
+                            type="button"
+                            onClick={() => setImage('')}
+                            className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 transition-colors"
+                            title="Remove image"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1.5 truncate">
+                        {uploadingPreviewUrl ? 'Compressing and uploading image...' : image}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

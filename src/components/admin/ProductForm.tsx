@@ -14,8 +14,12 @@ import {
   ChevronUp,
   Layers,
   Info,
+  Loader2,
+  UploadCloud,
+  X,
 } from 'lucide-react';
 import { Product, ProductVariant } from '@/types';
+import { compressImage } from '@/lib/imageCompression';
 
 interface VariantSpec {
   key: string;
@@ -93,6 +97,7 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
 
   const [expandedVariant, setExpandedVariant] = useState<number | null>(null);
   const [uploadingVariantImage, setUploadingVariantImage] = useState<number | null>(null);
+  const [uploadingVariantPreviews, setUploadingVariantPreviews] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -128,10 +133,18 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
   const handleVariantImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Immediately create local preview
+    const localPreviewUrl = URL.createObjectURL(file);
+    setUploadingVariantPreviews((prev) => ({ ...prev, [idx]: localPreviewUrl }));
     setUploadingVariantImage(idx);
-    const formData = new FormData();
-    formData.append('file', file);
+
     try {
+      // Compress image client-side to ~150-250KB before network transfer
+      const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.82 });
+      const formData = new FormData();
+      formData.append('file', compressed);
+
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
@@ -143,6 +156,12 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
       alert('Upload failed');
     } finally {
       setUploadingVariantImage(null);
+      setUploadingVariantPreviews((prev) => {
+        const next = { ...prev };
+        delete next[idx];
+        return next;
+      });
+      URL.revokeObjectURL(localPreviewUrl);
       e.target.value = '';
     }
   };
@@ -452,15 +471,45 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
                           <div>
                             <label className={LABEL_CLS}>Variant Picture *</label>
                             <div className="flex gap-3 items-start">
-                              {v.images?.[0] && (
-                                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0">
-                                  <Image src={v.images[0]} alt="Variant" fill className="object-cover" />
-                                </div>
-                              )}
+                              {(() => {
+                                const previewUrl = uploadingVariantPreviews[idx] || v.images?.[0];
+                                if (!previewUrl) return null;
+                                return (
+                                  <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 group bg-slate-50">
+                                    <img src={previewUrl} alt="Variant" className="w-full h-full object-cover" />
+                                    {uploadingVariantImage === idx && (
+                                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-[#ffffff] gap-0.5 z-10">
+                                        <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                                        <span className="text-[9px] font-bold">Uploading...</span>
+                                      </div>
+                                    )}
+                                    {uploadingVariantImage !== idx && (
+                                      <button
+                                        type="button"
+                                        onClick={() => updateVariant(idx, { images: [] })}
+                                        title="Remove picture"
+                                        className="absolute top-1 right-1 p-1 bg-red-500/90 hover:bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               <div className="flex-1 space-y-2">
                                 <input type="text" value={v.images?.[0] || ''} onChange={(e) => updateVariant(idx, { images: [e.target.value] })} placeholder="https://... or upload below" className={INPUT_CLS} />
                                 <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0B132B] text-[#ffffff] text-xs font-bold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer">
-                                  {uploadingVariantImage === idx ? 'Uploading...' : 'Upload Image'}
+                                  {uploadingVariantImage === idx ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      <span>Optimizing & Uploading...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UploadCloud className="w-3.5 h-3.5" />
+                                      <span>Upload Image</span>
+                                    </>
+                                  )}
                                   <input type="file" accept="image/*" onChange={(e) => handleVariantImageUpload(e, idx)} className="hidden" disabled={uploadingVariantImage !== null} />
                                 </label>
                               </div>
