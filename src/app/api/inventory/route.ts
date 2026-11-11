@@ -1,11 +1,28 @@
 import { NextResponse } from 'next/server';
-import { getInventoryStatus, updateStock } from '@/lib/db';
+import { getInventoryStatus, getInventoryPaginated, updateStock } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const isPaginated =
+      searchParams.get('paginated') === 'true' ||
+      searchParams.has('page') ||
+      searchParams.has('limit');
+
+    if (isPaginated) {
+      const result = await getInventoryPaginated({
+        search: searchParams.get('search') || undefined,
+        categoryId: searchParams.get('categoryId') || undefined,
+        lowStockOnly: searchParams.get('lowStockOnly') === 'true',
+        page: searchParams.get('page') ? Number(searchParams.get('page')) : 1,
+        limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : 24,
+      });
+      return NextResponse.json(result);
+    }
+
     const inventory = await getInventoryStatus();
     return NextResponse.json(inventory);
   } catch (error) {

@@ -6,6 +6,9 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Product } from '@/types';
 import { Flame, Sparkles, Search } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import InfiniteScrollTrigger from '@/components/admin/InfiniteScrollTrigger';
+
+const ADMIN_LIMIT = 24;
 
 export default function CurationsPage() {
   const { t } = useLanguage();
@@ -13,31 +16,86 @@ export default function CurationsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  const fetchData = async () => {
-    setLoading(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const fetchCurationsPage = async (targetPage: number, append: boolean) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     try {
-      const [prodRes, catRes] = await Promise.all([
-        fetch('/api/products?admin=true'),
-        fetch('/api/categories?admin=true')
-      ]);
+      const params = new URLSearchParams({
+        admin: 'true',
+        paginated: 'true',
+        page: String(targetPage),
+        limit: String(ADMIN_LIMIT),
+      });
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      if (selectedCategory) params.set('category', selectedCategory);
+
+      const prodRes = await fetch(`/api/products?${params.toString()}`);
       const prodData = await prodRes.json();
-      const catData = await catRes.json();
-      
-      if (Array.isArray(prodData)) setProducts(prodData);
-      if (Array.isArray(catData)) setCategories(catData);
+      const items = Array.isArray(prodData.items) ? prodData.items : [];
+      setProducts((prev) => (append ? [...prev, ...items] : items));
+      setPage(prodData.page || targetPage);
+      setTotalCount(typeof prodData.total === 'number' ? prodData.total : items.length);
+      setHasMore(Boolean(prodData.hasMore));
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    fetch('/api/categories?admin=true')
+      .then((res) => res.json())
+      .then((catData) => {
+        if (Array.isArray(catData)) setCategories(catData);
+      })
+      .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({
+      admin: 'true',
+      paginated: 'true',
+      page: '1',
+      limit: String(ADMIN_LIMIT),
+    });
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+    if (selectedCategory) params.set('category', selectedCategory);
+
+    fetch(`/api/products?${params.toString()}`)
+      .then((res) => res.json())
+      .then((prodData) => {
+        if (!active) return;
+        const items = Array.isArray(prodData.items) ? prodData.items : [];
+        setProducts(items);
+        setPage(prodData.page || 1);
+        setTotalCount(typeof prodData.total === 'number' ? prodData.total : items.length);
+        setHasMore(Boolean(prodData.hasMore));
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedSearch, selectedCategory]);
 
   const toggleStatus = async (product: Product, field: 'isBestSeller' | 'isNew') => {
     const newValue = !product[field];
@@ -67,11 +125,7 @@ export default function CurationsPage() {
     }
   };
 
-  const filtered = products.filter((p) => {
-    const matchSearch = search ? (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())) : true;
-    const matchCat = selectedCategory ? p.categoryId === selectedCategory : true;
-    return matchSearch && matchCat;
-  });
+  const filtered = products;
 
   return (
     <div className="space-y-6">
@@ -173,6 +227,14 @@ export default function CurationsPage() {
             </tbody>
           </table>
         </div>
+        <InfiniteScrollTrigger
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={() => fetchCurationsPage(page + 1, true)}
+          loadedCount={filtered.length}
+          totalCount={totalCount}
+          itemLabel="products"
+        />
       </div>
     </div>
   );

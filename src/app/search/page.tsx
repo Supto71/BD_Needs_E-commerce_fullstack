@@ -4,18 +4,20 @@ import Header from '@/components/storefront/Header';
 import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
 import ShopCatalog from '@/components/storefront/ShopCatalog';
-import { getProducts, getCategories } from '@/lib/db';
+import { getProductsPaginated, getCategories } from '@/lib/db';
+import { parseStorefrontSearchParams } from '@/lib/catalog';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SearchPage(props: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q } = await props.searchParams;
-  const query = q || '';
+  const sp = await props.searchParams;
+  const filters = parseStorefrontSearchParams(sp);
+  const query = filters.search || '';
 
-  const [products, categories] = await Promise.all([
-    getProducts({ search: query }),
+  const [catalog, categories] = await Promise.all([
+    getProductsPaginated(filters),
     getCategories(),
   ]);
 
@@ -26,7 +28,12 @@ export default async function SearchPage(props: {
       <main className="flex-1">
         <Suspense fallback={<div className="p-20 text-center text-xs font-semibold text-slate-400">Loading search results...</div>}>
           <ShopCatalog
-            initialProducts={products}
+            key={query}
+            initialProducts={catalog.items}
+            totalCount={catalog.total}
+            currentPage={catalog.page}
+            totalPages={catalog.totalPages}
+            availableBrands={catalog.brands}
             categories={categories}
             initialSearchQuery={query}
             title={query ? `Search Results for "${query}"` : 'Search All Products'}

@@ -17,6 +17,10 @@ import {
   Loader2,
   UploadCloud,
   X,
+  Star,
+  ArrowLeft,
+  ArrowRight,
+  ImagePlus,
 } from 'lucide-react';
 import { Product, ProductVariant } from '@/types';
 import { compressImage } from '@/lib/imageCompression';
@@ -31,6 +35,7 @@ interface RichVariant extends ProductVariant {
   variantFeatures?: string[];
   variantSpecs?: VariantSpec[];
   newFeatureInput?: string;
+  newImageUrlInput?: string;
 }
 
 interface ProductFormProps {
@@ -86,18 +91,20 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
     if (!initialData?.variants?.length) return [];
     return initialData.variants.map((v) => ({
       ...v,
+      images: Array.isArray(v.images) ? v.images.filter((img: any) => typeof img === 'string' && img.trim() !== '') : [],
       size: (v as any).size || '',
       variantFeatures: (v as any).features || [],
       variantSpecs: (v as any).specifications
         ? Object.entries((v as any).specifications as Record<string, string>).map(([key, val]) => ({ key, val }))
         : [],
       newFeatureInput: '',
+      newImageUrlInput: '',
     }));
   });
 
   const [expandedVariant, setExpandedVariant] = useState<number | null>(null);
   const [uploadingVariantImage, setUploadingVariantImage] = useState<number | null>(null);
-  const [uploadingVariantPreviews, setUploadingVariantPreviews] = useState<Record<number, string>>({});
+  const [uploadingVariantPreviews, setUploadingVariantPreviews] = useState<Record<number, string[]>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -116,6 +123,7 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
       variantFeatures: [],
       variantSpecs: [],
       newFeatureInput: '',
+      newImageUrlInput: '',
     };
     setVariants([...variants, newVar]);
     setExpandedVariant(variants.length);
@@ -131,29 +139,41 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
   };
 
   const handleVariantImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    // Immediately create local preview
-    const localPreviewUrl = URL.createObjectURL(file);
-    setUploadingVariantPreviews((prev) => ({ ...prev, [idx]: localPreviewUrl }));
+    const localPreviewUrls = files.map((file) => URL.createObjectURL(file));
+    setUploadingVariantPreviews((prev) => ({
+      ...prev,
+      [idx]: [...(prev[idx] || []), ...localPreviewUrls],
+    }));
     setUploadingVariantImage(idx);
 
     try {
-      // Compress image client-side to ~150-250KB before network transfer
-      const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.82 });
-      const formData = new FormData();
-      formData.append('file', compressed);
+      const uploadedUrls = await Promise.all(
+        files.map(async (file) => {
+          const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.82 });
+          const formData = new FormData();
+          formData.append('file', compressed);
 
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
-        updateVariant(idx, { images: [data.url] });
-      } else {
-        alert(data.error || 'Upload failed');
-      }
-    } catch {
-      alert('Upload failed');
+          const res = await fetch('/api/upload', { method: 'POST', body: formData });
+          const data = await res.json();
+          if (!res.ok || !data.success || !data.url) {
+            throw new Error(data.error || 'Upload failed');
+          }
+          return data.url as string;
+        })
+      );
+
+      setVariants((prev) =>
+        prev.map((v, i) => {
+          if (i !== idx) return v;
+          const existing = Array.isArray(v.images) ? v.images.filter(Boolean) : [];
+          return { ...v, images: Array.from(new Set([...existing, ...uploadedUrls])) };
+        })
+      );
+    } catch (err: any) {
+      alert(err?.message || 'One or more images failed to upload');
     } finally {
       setUploadingVariantImage(null);
       setUploadingVariantPreviews((prev) => {
@@ -161,9 +181,48 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
         delete next[idx];
         return next;
       });
-      URL.revokeObjectURL(localPreviewUrl);
+      localPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
       e.target.value = '';
     }
+  };
+
+  const addVariantImageUrl = (idx: number) => {
+    const v = variants[idx];
+    const url = v?.newImageUrlInput?.trim();
+    if (!url) return;
+    const existing = Array.isArray(v.images) ? v.images.filter(Boolean) : [];
+    if (existing.includes(url)) {
+      updateVariant(idx, { newImageUrlInput: '' });
+      return;
+    }
+    updateVariant(idx, {
+      images: [...existing, url],
+      newImageUrlInput: '',
+    });
+  };
+
+  const removeVariantImage = (varIdx: number, imgIdx: number) => {
+    const v = variants[varIdx];
+    const existing = Array.isArray(v.images) ? v.images : [];
+    updateVariant(varIdx, { images: existing.filter((_, i) => i !== imgIdx) });
+  };
+
+  const moveVariantImage = (varIdx: number, imgIdx: number, dir: -1 | 1) => {
+    const v = variants[varIdx];
+    const existing = [...(Array.isArray(v.images) ? v.images : [])];
+    const targetIdx = imgIdx + dir;
+    if (targetIdx < 0 || targetIdx >= existing.length) return;
+    const [moved] = existing.splice(imgIdx, 1);
+    existing.splice(targetIdx, 0, moved);
+    updateVariant(varIdx, { images: existing });
+  };
+
+  const setMainVariantImage = (varIdx: number, imgIdx: number) => {
+    if (imgIdx === 0) return;
+    const v = variants[varIdx];
+    const existing = [...(Array.isArray(v.images) ? v.images : [])];
+    const [selected] = existing.splice(imgIdx, 1);
+    updateVariant(varIdx, { images: [selected, ...existing] });
   };
 
   const addVariantSpec = (idx: number) => {
@@ -206,8 +265,9 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
     if (!sku.trim()) { setMessage('Base SKU Code is required'); setActiveSection('general'); return; }
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
+      const cleanImages = (v.images || []).filter((img: any) => typeof img === 'string' && img.trim() !== '');
       if (!v.sku.trim()) { setMessage(`Variant #${i + 1}: SKU is required`); setActiveSection('variants'); return; }
-      if (!v.images?.length || !v.images[0]) { setMessage(`Variant #${i + 1}: Picture is required`); setActiveSection('variants'); return; }
+      if (cleanImages.length === 0) { setMessage(`Variant #${i + 1}: At least one picture is required`); setActiveSection('variants'); return; }
       if (!v.variantFeatures?.length) { setMessage(`Variant #${i + 1}: At least one Key Highlight Bullet is required`); setActiveSection('variants'); return; }
     }
     setLoading(true);
@@ -215,6 +275,7 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
     const serialisedVariants = variants.map((v) => {
       const specMap: Record<string, string> = {};
       (v.variantSpecs || []).forEach((s) => { if (s.key) specMap[s.key] = s.val; });
+      const cleanImages = (v.images || []).filter((img: any) => typeof img === 'string' && img.trim() !== '');
       return {
         id: v.id,
         productId: v.productId,
@@ -225,9 +286,12 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
         price: Number(originalPrice),
         stock: Number(v.stock),
         lowStockThreshold: v.lowStockThreshold,
-        images: v.images,
+        images: cleanImages,
       };
     });
+    const allCleanImages = Array.from(
+      new Set(serialisedVariants.flatMap((v) => v.images || []))
+    );
     const payload = {
       name, brand, categoryId, categoryName, 
       subcategoryId: subcategoryId || undefined,
@@ -240,7 +304,7 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
       seoDescription: seoDescription.trim() || null,
       imageAlt: imageAlt.trim() || null,
       isBestSeller: false, isNew: false,
-      images: variants.flatMap((v) => v.images || []),
+      images: allCleanImages,
       variants: serialisedVariants,
       features: variants[0]?.variantFeatures || [],
       specifications: (() => {
@@ -429,6 +493,9 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
                         <button type="button" onClick={() => setExpandedVariant(isOpen ? null : idx)} className="flex items-center gap-3 flex-1 text-left">
                           {v.colorHex && <span className="w-4 h-4 rounded-full border border-slate-300 shrink-0" style={{ backgroundColor: v.colorHex }} />}
                           <span className="text-xs font-bold text-slate-800">Variant #{idx + 1}{badge ? `: ${badge}` : ''}</span>
+                          <span className="text-[10px] font-bold text-slate-500 bg-[#ffffff] border border-slate-200 px-2 py-0.5 rounded-full">
+                            {v.images?.length || 0} {v.images?.length === 1 ? 'photo' : 'photos'}
+                          </span>
                           {isOpen ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
                         </button>
                         <button type="button" onClick={() => removeVariant(idx)} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors">
@@ -469,50 +536,136 @@ export default function ProductForm({ initialData, isEdit }: ProductFormProps) {
                           </div>
 
                           <div>
-                            <label className={LABEL_CLS}>Variant Picture *</label>
-                            <div className="flex gap-3 items-start">
-                              {(() => {
-                                const previewUrl = uploadingVariantPreviews[idx] || v.images?.[0];
-                                if (!previewUrl) return null;
-                                return (
-                                  <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 group bg-slate-50">
-                                    <img src={previewUrl} alt="Variant" className="w-full h-full object-cover" />
-                                    {uploadingVariantImage === idx && (
-                                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-[#ffffff] gap-0.5 z-10">
-                                        <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                                        <span className="text-[9px] font-bold">Uploading...</span>
-                                      </div>
-                                    )}
-                                    {uploadingVariantImage !== idx && (
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className={LABEL_CLS + ' mb-0'}>
+                                Variant Pictures * <span className="text-slate-400 font-normal">({v.images?.length || 0} added — 1st is Main)</span>
+                              </label>
+                            </div>
+
+                            {/* Multi-Image Thumbnail Grid */}
+                            {((v.images && v.images.length > 0) || (uploadingVariantPreviews[idx]?.length || 0) > 0) && (
+                              <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2.5 mb-3">
+                                {(v.images || []).map((imgUrl, imgIdx) => (
+                                  <div
+                                    key={`${imgUrl}-${imgIdx}`}
+                                    className={`relative aspect-square rounded-xl overflow-hidden border-2 group bg-slate-50 ${
+                                      imgIdx === 0 ? 'border-blue-600 ring-2 ring-blue-500/20' : 'border-slate-200'
+                                    }`}
+                                  >
+                                    <img src={imgUrl} alt={`Variant ${idx + 1} - ${imgIdx + 1}`} className="w-full h-full object-cover" />
+
+                                    {imgIdx === 0 ? (
+                                      <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-blue-600 text-[#ffffff] text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                        Main
+                                      </span>
+                                    ) : (
                                       <button
                                         type="button"
-                                        onClick={() => updateVariant(idx, { images: [] })}
-                                        title="Remove picture"
-                                        className="absolute top-1 right-1 p-1 bg-red-500/90 hover:bg-red-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => setMainVariantImage(idx, imgIdx)}
+                                        title="Set as Main image"
+                                        className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-[#0B132B]/80 hover:bg-blue-600 text-[#ffffff] text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5"
                                       >
-                                        <X className="w-3 h-3" />
+                                        <Star className="w-2.5 h-2.5" />
+                                        Main
                                       </button>
                                     )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => removeVariantImage(idx, imgIdx)}
+                                      title="Remove picture"
+                                      className="absolute top-1.5 right-1.5 p-1 bg-red-500/90 hover:bg-red-600 text-[#ffffff] rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-xs"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+
+                                    {(v.images?.length || 0) > 1 && (
+                                      <div className="absolute bottom-1.5 inset-x-1.5 flex justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                          type="button"
+                                          onClick={() => moveVariantImage(idx, imgIdx, -1)}
+                                          disabled={imgIdx === 0}
+                                          title="Move left"
+                                          className="p-1 rounded bg-black/70 text-[#ffffff] hover:bg-black disabled:opacity-30"
+                                        >
+                                          <ArrowLeft className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => moveVariantImage(idx, imgIdx, 1)}
+                                          disabled={imgIdx === (v.images?.length || 0) - 1}
+                                          title="Move right"
+                                          className="p-1 rounded bg-black/70 text-[#ffffff] hover:bg-black disabled:opacity-30"
+                                        >
+                                          <ArrowRight className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
-                                );
-                              })()}
-                              <div className="flex-1 space-y-2">
-                                <input type="text" value={v.images?.[0] || ''} onChange={(e) => updateVariant(idx, { images: [e.target.value] })} placeholder="https://... or upload below" className={INPUT_CLS} />
-                                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0B132B] text-[#ffffff] text-xs font-bold rounded-lg hover:bg-blue-600 transition-colors cursor-pointer">
-                                  {uploadingVariantImage === idx ? (
-                                    <>
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                      <span>Optimizing & Uploading...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <UploadCloud className="w-3.5 h-3.5" />
-                                      <span>Upload Image</span>
-                                    </>
-                                  )}
-                                  <input type="file" accept="image/*" onChange={(e) => handleVariantImageUpload(e, idx)} className="hidden" disabled={uploadingVariantImage !== null} />
-                                </label>
+                                ))}
+
+                                {(uploadingVariantPreviews[idx] || []).map((previewUrl, pIdx) => (
+                                  <div
+                                    key={`uploading-${pIdx}`}
+                                    className="relative aspect-square rounded-xl overflow-hidden border border-blue-300 bg-slate-50"
+                                  >
+                                    <img src={previewUrl} alt="Uploading preview" className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-[#ffffff] gap-0.5">
+                                      <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                                      <span className="text-[9px] font-bold">Uploading...</span>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
+                            )}
+
+                            {/* Upload Multiple Files + Add Image URL Controls */}
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <div className="flex flex-1 gap-2">
+                                <input
+                                  type="text"
+                                  value={v.newImageUrlInput || ''}
+                                  onChange={(e) => updateVariant(idx, { newImageUrlInput: e.target.value })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      addVariantImageUrl(idx);
+                                    }
+                                  }}
+                                  placeholder="Paste image URL (https://...) and click Add"
+                                  className={INPUT_CLS}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => addVariantImageUrl(idx)}
+                                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-[#ffffff] rounded-xl text-xs font-bold shrink-0 inline-flex items-center gap-1"
+                                >
+                                  <ImagePlus className="w-3.5 h-3.5" />
+                                  Add URL
+                                </button>
+                              </div>
+
+                              <label className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#0B132B] text-[#ffffff] text-xs font-bold rounded-xl hover:bg-blue-600 transition-colors cursor-pointer shrink-0">
+                                {uploadingVariantImage === idx ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Optimizing & Uploading...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UploadCloud className="w-3.5 h-3.5" />
+                                    <span>Upload Multiple Images</span>
+                                  </>
+                                )}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onChange={(e) => handleVariantImageUpload(e, idx)}
+                                  className="hidden"
+                                  disabled={uploadingVariantImage !== null}
+                                />
+                              </label>
                             </div>
                           </div>
 

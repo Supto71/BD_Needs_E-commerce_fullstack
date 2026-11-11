@@ -4,6 +4,9 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, Boxes, AlertTriangle, CheckCircle2, Save, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import InfiniteScrollTrigger from '@/components/admin/InfiniteScrollTrigger';
+
+const ADMIN_LIMIT = 24;
 
 export default function AdminInventoryPage() {
   const { isAdmin } = useAuth();
@@ -11,29 +14,91 @@ export default function AdminInventoryPage() {
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterLowStock, setFilterLowStock] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [editingStock, setEditingStock] = useState<Record<string, number>>({});
   const [editingThreshold, setEditingThreshold] = useState<Record<string, number>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
 
-  const fetchInventory = () => {
-    setLoading(true);
-    Promise.all([
-      fetch('/api/inventory').then(res => res.json()),
-      fetch('/api/categories?admin=true').then(res => res.json())
-    ]).then(([invData, catData]) => {
-      if (Array.isArray(invData)) setInventory(invData);
-      if (Array.isArray(catData)) setCategories(catData);
-    })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const fetchInventoryPage = async (targetPage: number, append: boolean) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+
+    try {
+      const params = new URLSearchParams({
+        paginated: 'true',
+        page: String(targetPage),
+        limit: String(ADMIN_LIMIT),
+      });
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      if (categoryFilter) params.set('categoryId', categoryFilter);
+      if (filterLowStock) params.set('lowStockOnly', 'true');
+
+      const res = await fetch(`/api/inventory?${params.toString()}`);
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      setInventory((prev) => (append ? [...prev, ...items] : items));
+      setPage(data.page || targetPage);
+      setTotalCount(typeof data.total === 'number' ? data.total : items.length);
+      setHasMore(Boolean(data.hasMore));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   };
 
   useEffect(() => {
-    fetchInventory();
+    fetch('/api/categories?admin=true')
+      .then((res) => res.json())
+      .then((catData) => {
+        if (Array.isArray(catData)) setCategories(catData);
+      })
+      .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({
+      paginated: 'true',
+      page: '1',
+      limit: String(ADMIN_LIMIT),
+    });
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+    if (categoryFilter) params.set('categoryId', categoryFilter);
+    if (filterLowStock) params.set('lowStockOnly', 'true');
+
+    fetch(`/api/inventory?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        const items = Array.isArray(data.items) ? data.items : [];
+        setInventory(items);
+        setPage(data.page || 1);
+        setTotalCount(typeof data.total === 'number' ? data.total : items.length);
+        setHasMore(Boolean(data.hasMore));
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedSearch, categoryFilter, filterLowStock]);
 
   const handleStockChange = (key: string, val: number) => {
     setEditingStock((prev) => ({ ...prev, [key]: val }));
@@ -74,7 +139,7 @@ export default function AdminInventoryPage() {
         })
       );
 
-      fetchInventory();
+      fetchInventoryPage(1, false);
       setIsEditing(false);
       setEditingStock({});
       setEditingThreshold({});
@@ -85,18 +150,7 @@ export default function AdminInventoryPage() {
     }
   };
 
-  const filtered = inventory.filter((item) => {
-    const matchesSearch =
-      !search ||
-      item.productName.toLowerCase().includes(search.toLowerCase()) ||
-      item.sku.toLowerCase().includes(search.toLowerCase()) ||
-      (item.colorName && item.colorName.toLowerCase().includes(search.toLowerCase()));
-
-    const matchesLow = !filterLowStock || item.isLowStock || item.isOutOfStock;
-    const matchesCategory = !categoryFilter || item.categoryId === categoryFilter;
-
-    return matchesSearch && matchesLow && matchesCategory;
-  });
+  const filtered = inventory;
 
   return (
     <div className="space-y-6">
@@ -147,7 +201,7 @@ export default function AdminInventoryPage() {
           )}
 
           <button
-            onClick={fetchInventory}
+            onClick={() => fetchInventoryPage(1, false)}
             disabled={savingAll}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
           >
@@ -308,6 +362,14 @@ export default function AdminInventoryPage() {
             </tbody>
           </table>
         </div>
+        <InfiniteScrollTrigger
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={() => fetchInventoryPage(page + 1, true)}
+          loadedCount={filtered.length}
+          totalCount={totalCount}
+          itemLabel="inventory items"
+        />
       </div>
     </div>
   );

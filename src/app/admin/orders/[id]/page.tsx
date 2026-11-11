@@ -258,7 +258,7 @@ export default function AdminOrderDetailPage(props: {
                   </div>
                 )}
               </div>
-              <p className="text-slate-600 mt-1">{order.customerEmail}</p>
+              {order.customerEmail && <p className="text-slate-600 mt-1">{order.customerEmail}</p>}
               <p className="text-slate-600 font-medium">{order.customerPhone}</p>
             </div>
 

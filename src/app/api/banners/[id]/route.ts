@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateBanner, deleteBanner } from '@/lib/db';
+import { revalidatePath } from 'next/cache';
 
 export async function PUT(
   request: Request,
@@ -12,6 +13,7 @@ export async function PUT(
     if (!updated) {
       return NextResponse.json({ error: 'Banner not found' }, { status: 404 });
     }
+    revalidatePath('/', 'layout');
     return NextResponse.json(updated);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to update banner' }, { status: 500 });
@@ -28,6 +30,7 @@ export async function DELETE(
     if (!success) {
       return NextResponse.json({ error: 'Banner not found' }, { status: 404 });
     }
+    revalidatePath('/', 'layout');
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to delete banner' }, { status: 500 });

@@ -7,11 +7,15 @@ import { Order, OrderStatus } from '@/types';
 import { formatPrice, formatDate } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import InfiniteScrollTrigger from '@/components/admin/InfiniteScrollTrigger';
+
+const ADMIN_LIMIT = 24;
 
 function OrdersContent() {
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [clientEmail, setClientEmail] = useState(searchParams.get('clientEmail') || '');
   const [statusFilter, setStatusFilter] = useState('');
   const [timeFilter, setTimeFilter] = useState('All');
@@ -22,87 +26,129 @@ function OrdersContent() {
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear().toString());
   const [categoryFilter, setCategoryFilter] = useState('');
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [summary, setSummary] = useState({
+    processing: 0,
+    successful: 0,
+    returned: 0,
+    cancelled: 0,
+  });
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const isDateInRange = (dateStr: string, filter: string) => {
-    if (filter === 'All') return true;
-    const date = new Date(dateStr);
-    const now = new Date();
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-    const diffTime = startOfToday.getTime() - startOfDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (filter === 'Daily') return diffDays === 0;
-    if (filter === 'Weekly') return diffDays <= 7;
-    if (filter === 'Monthly') {
-      const [y, m] = selectedMonth.split('-');
-      return date.getMonth() + 1 === parseInt(m) && date.getFullYear() === parseInt(y);
-    }
-    if (filter === 'Yearly') {
-      return date.getFullYear() === parseInt(selectedYear);
-    }
-
-    return true;
+  const buildOrderQueryParams = (targetPage: number) => {
+    const params = new URLSearchParams({
+      paginated: 'true',
+      page: String(targetPage),
+      limit: String(ADMIN_LIMIT),
+    });
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+    if (clientEmail) params.set('clientEmail', clientEmail);
+    if (statusFilter) params.set('status', statusFilter);
+    if (categoryFilter) params.set('categoryId', categoryFilter);
+    if (timeFilter && timeFilter !== 'All') params.set('timeFilter', timeFilter);
+    if (timeFilter === 'Monthly') params.set('selectedMonth', selectedMonth);
+    if (timeFilter === 'Yearly') params.set('selectedYear', selectedYear);
+    return params;
   };
 
-  const fetchOrders = () => {
-    setLoading(true);
-    Promise.all([
-      fetch('/api/orders').then(res => res.json()),
-      fetch('/api/categories?admin=true').then(res => res.json())
-    ]).then(([ordersData, catData]) => {
-      if (Array.isArray(ordersData)) setOrders(ordersData);
-      if (Array.isArray(catData)) setCategories(catData);
-    })
-    .catch(console.error)
-    .finally(() => setLoading(false));
+  const fetchOrdersPage = async (targetPage: number, append: boolean) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+    try {
+      const params = buildOrderQueryParams(targetPage);
+      const res = await fetch(`/api/orders?${params.toString()}`);
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      setOrders((prev) => (append ? [...prev, ...items] : items));
+      setPage(data.page || targetPage);
+      setTotalCount(typeof data.total === 'number' ? data.total : items.length);
+      setHasMore(Boolean(data.hasMore));
+      if (data.summary) {
+        setSummary(data.summary);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetch('/api/categories?admin=true')
+      .then((res) => res.json())
+      .then((catData) => {
+        if (Array.isArray(catData)) setCategories(catData);
+      })
+      .catch(console.error);
   }, []);
 
-  const filtered = orders.filter((o) => {
-    // Exact email filter takes precedence
-    if (clientEmail && o.customerEmail !== clientEmail) {
-      return false;
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({
+      paginated: 'true',
+      page: '1',
+      limit: String(ADMIN_LIMIT),
+    });
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+    if (clientEmail) params.set('clientEmail', clientEmail);
+    if (statusFilter) params.set('status', statusFilter);
+    if (categoryFilter) params.set('categoryId', categoryFilter);
+    if (timeFilter && timeFilter !== 'All') params.set('timeFilter', timeFilter);
+    if (timeFilter === 'Monthly') params.set('selectedMonth', selectedMonth);
+    if (timeFilter === 'Yearly') params.set('selectedYear', selectedYear);
+
+    fetch(`/api/orders?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        const items = Array.isArray(data.items) ? data.items : [];
+        setOrders(items);
+        setPage(data.page || 1);
+        setTotalCount(typeof data.total === 'number' ? data.total : items.length);
+        setHasMore(Boolean(data.hasMore));
+        if (data.summary) setSummary(data.summary);
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedSearch, clientEmail, statusFilter, timeFilter, selectedMonth, selectedYear, categoryFilter]);
+
+  const filtered = orders;
+  const successfulOrders = summary.successful;
+  const returnedOrders = summary.returned;
+  const cancelledOrders = summary.cancelled;
+  const processingOrders = summary.processing;
+
+  const exportToCSV = async () => {
+    const params = buildOrderQueryParams(1);
+    params.delete('paginated');
+    params.delete('page');
+    params.delete('limit');
+    params.set('export', 'true');
+
+    let exportOrders: Order[] = filtered;
+    try {
+      const res = await fetch(`/api/orders?${params.toString()}`);
+      const data = await res.json();
+      if (Array.isArray(data)) exportOrders = data;
+    } catch (err) {
+      console.error('Export fetch error:', err);
     }
-
-    const matchesSearch =
-      !search ||
-      o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
-      o.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      o.customerEmail.toLowerCase().includes(search.toLowerCase()) ||
-      o.trackingNumber.toLowerCase().includes(search.toLowerCase());
-
-    let matchesStatus = true;
-    if (statusFilter) {
-      if (statusFilter === 'PROCESSING') {
-        matchesStatus = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY'].includes(o.orderStatus);
-      } else {
-        matchesStatus = o.orderStatus === statusFilter;
-      }
-    }
-    const matchesTime = isDateInRange(o.createdAt, timeFilter);
-    
-    let matchesCategory = true;
-    if (categoryFilter) {
-      matchesCategory = o.items.some((item: any) => item.product?.categoryId === categoryFilter);
-    }
-
-    return matchesSearch && matchesStatus && matchesTime && matchesCategory;
-  });
-
-  const successfulOrders = filtered.filter(o => o.orderStatus === 'DELIVERED').length;
-  const returnedOrders = filtered.filter(o => o.orderStatus === 'REFUNDED').length;
-  const cancelledOrders = filtered.filter(o => o.orderStatus === 'CANCELLED').length;
-  const processingOrders = filtered.filter(o => ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'OUT_FOR_DELIVERY'].includes(o.orderStatus)).length;
-
-  const exportToCSV = () => {
-    if (filtered.length === 0) return;
+    if (exportOrders.length === 0) return;
 
     const headers = [
       'Order ID',
@@ -119,7 +165,7 @@ function OrdersContent() {
 
     const csvRows = [headers.join(',')];
 
-    filtered.forEach(order => {
+    exportOrders.forEach(order => {
       const itemsDetail = order.items.map(item => `${item.productName} (Qty: ${item.quantity})`).join('; ');
       const row = [
         `"${order.orderNumber}"`,
@@ -414,6 +460,14 @@ function OrdersContent() {
             </tbody>
           </table>
         </div>
+        <InfiniteScrollTrigger
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={() => fetchOrdersPage(page + 1, true)}
+          loadedCount={filtered.length}
+          totalCount={totalCount}
+          itemLabel="orders"
+        />
       </div>
     </div>
   );

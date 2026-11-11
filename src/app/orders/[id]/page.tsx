@@ -2,7 +2,7 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ChevronLeft, Truck, Package, CheckCircle2, ShieldCheck, MapPin } from 'lucide-react';
+import { ChevronLeft, Truck, Download } from 'lucide-react';
 import AnnouncementBar from '@/components/storefront/AnnouncementBar';
 import Header from '@/components/storefront/Header';
 import Footer from '@/components/storefront/Footer';
@@ -52,7 +52,14 @@ export default async function OrderDetailPage(props: {
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href={`/invoice/${order.id}?print=1`}
+                  className="px-5 py-2.5 bg-[#0B132B] hover:bg-slate-800 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Chalan
+                </Link>
                 <Link
                   href={`/track-order?orderId=${order.orderNumber}`}
                   className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-xs"
@@ -139,7 +146,7 @@ export default async function OrderDetailPage(props: {
                 <p>{(order.shippingAddress as any)?.street}</p>
                 <p>{(order.shippingAddress as any)?.city}, {(order.shippingAddress as any)?.postalCode}</p>
                 <p className="text-slate-400 mt-2">Phone: {order.customerPhone}</p>
-                <p className="text-slate-400">Email: {order.customerEmail}</p>
+                {order.customerEmail && <p className="text-slate-400">Email: {order.customerEmail}</p>}
               </div>
 
               <div className="space-y-2 text-slate-600 bg-slate-50 p-5 rounded-2xl border border-slate-100">

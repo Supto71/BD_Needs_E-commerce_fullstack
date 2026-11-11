@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sendOrderChalanEmail } from '@/lib/chalan';
 
 export async function POST(request: Request) {
   try {
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Amount mismatch' }, { status: 400 });
       }
 
-      await prisma.order.update({
+      const updatedOrder = await prisma.order.update({
         where: { id: orderId },
         data: {
           paymentStatus: 'PAID',
@@ -66,7 +67,10 @@ export async function POST(request: Request) {
           uddoktaTransactionId: data.transaction_id || null,
           paymentDetails: data,
         },
+        include: { items: true },
       });
+      const origin = new URL(request.url).origin;
+      await sendOrderChalanEmail(updatedOrder, origin);
       console.log(`Order ${orderId} marked as PAID via Webhook verify`);
     } else if (data.status === 'FAILED' || data.status === 'CANCELED') {
       await prisma.order.update({

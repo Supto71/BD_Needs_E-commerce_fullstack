@@ -5,7 +5,8 @@ import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
 import ShopCatalog from '@/components/storefront/ShopCatalog';
 import SeoContentBlock from '@/components/storefront/SeoContentBlock';
-import { getProducts, getCategories } from '@/lib/db';
+import { getProductsPaginated, getCategories } from '@/lib/db';
+import { parseStorefrontSearchParams } from '@/lib/catalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +23,14 @@ export const metadata: import('next').Metadata = {
   },
 };
 
-export default async function ShopPage() {
-  const [products, categories] = await Promise.all([
-    getProducts(),
+export default async function ShopPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await props.searchParams;
+  const filters = parseStorefrontSearchParams(sp);
+
+  const [catalog, categories] = await Promise.all([
+    getProductsPaginated(filters),
     getCategories(),
   ]);
 
@@ -35,7 +41,11 @@ export default async function ShopPage() {
       <main className="flex-1">
         <Suspense fallback={<div className="p-20 text-center text-xs font-semibold text-slate-400">Loading catalog...</div>}>
           <ShopCatalog
-            initialProducts={products}
+            initialProducts={catalog.items}
+            totalCount={catalog.total}
+            currentPage={catalog.page}
+            totalPages={catalog.totalPages}
+            availableBrands={catalog.brands}
             categories={categories}
             title="All Collections"
             subtitle="Engineered audio, contemporary fashion, performance runners, and horology essentials."

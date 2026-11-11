@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getOrderById, updateOrderStatus, deleteOrder } from '@/lib/db';
+import { createReceiptToken, verifyReceiptToken } from '@/lib/chalan';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
@@ -35,12 +36,19 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const token = searchParams.get('token');
+
     const sessionUser = await getSessionUser();
     const isAdmin = sessionUser?.role === 'ADMIN';
     const isOwner = sessionUser?.id && order.userId === sessionUser.id;
+    const hasValidReceiptToken = verifyReceiptToken(order.id, token);
 
-    if (isAdmin || isOwner) {
-      return NextResponse.json(order);
+    if (isAdmin || isOwner || hasValidReceiptToken) {
+      return NextResponse.json({
+        ...order,
+        receiptToken: createReceiptToken(order.id),
+      });
     }
 
     // Sanitize order for public tracking (guest)

@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   PackageCheck,
   Truck,
+  Download,
+  Mail,
 } from 'lucide-react';
 import AnnouncementBar from '@/components/storefront/AnnouncementBar';
 import Header from '@/components/storefront/Header';
@@ -20,10 +22,12 @@ import { Order } from '@/types';
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
+  const tokenParam = searchParams.get('token');
   const { t } = useLanguage();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [receiptToken, setReceiptToken] = useState<string>('');
 
   useEffect(() => {
     // Launch celebratory confetti
@@ -39,11 +43,27 @@ function OrderSuccessContent() {
     }
 
     if (orderId) {
-      fetch(`/api/orders/${orderId}`)
+      let resolvedToken = tokenParam || '';
+      if (!resolvedToken) {
+        try {
+          resolvedToken = sessionStorage.getItem(`bdneeds_chalan_${orderId}`) || '';
+        } catch {}
+      } else {
+        try {
+          sessionStorage.setItem(`bdneeds_chalan_${orderId}`, resolvedToken);
+        } catch {}
+      }
+      setReceiptToken(resolvedToken);
+
+      const query = resolvedToken ? `?token=${encodeURIComponent(resolvedToken)}` : '';
+      fetch(`/api/orders/${orderId}${query}`)
         .then((res) => res.json())
         .then((data) => {
           if (!data.error) {
             setOrder(data);
+            if (data.receiptToken) {
+              setReceiptToken(data.receiptToken);
+            }
           }
         })
         .catch(console.error)
@@ -51,7 +71,7 @@ function OrderSuccessContent() {
     } else {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, tokenParam]);
 
   return (
     <main className="flex-1 bg-slate-50/60 py-12 sm:py-16">
@@ -75,26 +95,48 @@ function OrderSuccessContent() {
           </p>
 
           {order && (
-            <div className="pt-4 flex flex-wrap items-center justify-center gap-3 text-xs font-semibold">
-              <span className="px-3.5 py-1.5 bg-slate-100 rounded-xl text-slate-800">
-                {t('orderNumber')} #{order.orderNumber}
-              </span>
-              <span className="px-3.5 py-1.5 bg-blue-50 text-blue-700 rounded-xl">
-                {t('trackingNumber')} #{order.trackingNumber}
-              </span>
+            <div className="pt-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold">
+                <span className="px-3.5 py-1.5 bg-slate-100 rounded-xl text-slate-800">
+                  {t('orderNumber')} #{order.orderNumber}
+                </span>
+                <span className="px-3.5 py-1.5 bg-blue-50 text-blue-700 rounded-xl">
+                  {t('trackingNumber')} #{order.trackingNumber}
+                </span>
+              </div>
+
+              {order.customerEmail ? (
+                <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-full">
+                  <Mail className="w-3.5 h-3.5" />
+                  Order Chalan sent to {order.customerEmail}
+                </p>
+              ) : (
+                <p className="text-xs font-medium text-slate-500">
+                  Your Order Chalan is ready below — click Download Chalan to save or print it.
+                </p>
+              )}
             </div>
           )}
 
           {/* Action CTAs */}
           <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
             {order && (
-              <Link
-                href={`/track-order?orderId=${order.orderNumber}`}
-                className="px-6 py-3 bg-[#0B132B] hover:bg-slate-800 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
-              >
-                <Truck className="w-4 h-4" />
-                {t('trackMyParcel')}
-              </Link>
+              <>
+                <Link
+                  href={`/invoice/${order.id}?print=1${receiptToken ? `&token=${encodeURIComponent(receiptToken)}` : ''}`}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Chalan
+                </Link>
+                <Link
+                  href={`/track-order?orderId=${order.orderNumber}`}
+                  className="px-6 py-3 bg-[#0B132B] hover:bg-slate-800 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
+                >
+                  <Truck className="w-4 h-4" />
+                  {t('trackMyParcel')}
+                </Link>
+              </>
             )}
             <Link
               href="/shop"

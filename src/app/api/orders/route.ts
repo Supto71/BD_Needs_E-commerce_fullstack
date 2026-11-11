@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getOrders, createOrder } from '@/lib/db';
+import { getOrders, getOrdersPaginated, createOrder } from '@/lib/db';
+import { createReceiptToken, sendOrderChalanEmail } from '@/lib/chalan';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,27 @@ export async function GET(request: Request) {
 
     // Determine whose orders to fetch
     const effectiveUserId = sessionUser.role === 'ADMIN' ? userIdParam : sessionUser.id;
+    const isPaginated =
+      searchParams.get('paginated') === 'true' ||
+      searchParams.has('page') ||
+      searchParams.has('limit');
+    const isExport = searchParams.get('export') === 'true';
+
+    if (isPaginated || isExport) {
+      const result = await getOrdersPaginated({
+        userId: effectiveUserId,
+        clientEmail: searchParams.get('clientEmail') || undefined,
+        search: searchParams.get('search') || undefined,
+        status: searchParams.get('status') || undefined,
+        categoryId: searchParams.get('categoryId') || undefined,
+        timeFilter: searchParams.get('timeFilter') || undefined,
+        selectedMonth: searchParams.get('selectedMonth') || undefined,
+        selectedYear: searchParams.get('selectedYear') || undefined,
+        page: isExport ? 1 : searchParams.get('page') ? Number(searchParams.get('page')) : 1,
+        limit: isExport ? 10000 : searchParams.get('limit') ? Number(searchParams.get('limit')) : 24,
+      });
+      return NextResponse.json(isExport ? result.items : result);
+    }
 
     const orders = await getOrders(effectiveUserId);
     return NextResponse.json(orders);
@@ -52,7 +74,14 @@ export async function GET(request: Request) {
 const orderSchema = z.object({
   userId: z.string().optional().nullable(),
   customerName: z.string().min(1, 'Customer name is required'),
-  customerEmail: z.string().email('Invalid email address'),
+  customerEmail: z
+    .string()
+    .trim()
+    .optional()
+    .default('')
+    .refine((val) => val === '' || z.string().email().safeParse(val).success, {
+      message: 'Invalid email address',
+    }),
   customerPhone: z.string().min(1, 'Phone number is required'),
   shippingAddress: z.object({
     fullName: z.string().min(1).optional(),
@@ -120,15 +149,20 @@ export async function POST(request: Request) {
       adminShippingFee: isAdmin ? body.adminShippingFee : undefined,
     });
 
+    const origin =
+      request.headers.get('origin') ||
+      process.env.NEXTAUTH_URL ||
+      'http://localhost:3000';
+    const receiptToken = createReceiptToken(order.id);
+
     if (body.paymentMethod === 'ONLINE') {
       const uddoktaPayApiKey = process.env.UDDOKTAPAY_API_KEY;
       const uddoktaPayBaseUrl = process.env.UDDOKTAPAY_BASE_URL;
 
       if (uddoktaPayApiKey && uddoktaPayBaseUrl) {
-        const origin = request.headers.get('origin') || process.env.NEXTAUTH_URL || 'http://localhost:3000';
         const paymentData = {
           full_name: body.customerName,
-          email: body.customerEmail,
+          email: body.customerEmail || 'guest@bdneeds.com.bd',
           amount: order.total, // using total from DB, it's safer
           metadata: { order_id: order.id },
           redirect_url: `${origin}/api/uddoktapay/success?orderId=${order.id}`,
@@ -150,7 +184,10 @@ export async function POST(request: Request) {
           console.log("UddoktaPay Response:", upData);
 
           if (upData.status && upData.payment_url) {
-            return NextResponse.json({ ...order, paymentUrl: upData.payment_url }, { status: 201 });
+            return NextResponse.json(
+              { ...order, receiptToken, paymentUrl: upData.payment_url },
+              { status: 201 }
+            );
           } else {
             console.error('UddoktaPay API Error:', upData);
             return NextResponse.json({ error: 'Payment gateway error', details: upData }, { status: 400 });
@@ -162,7 +199,10 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json(order, { status: 201 });
+    // Send Order Chalan email if customer provided an email address
+    await sendOrderChalanEmail(order, origin);
+
+    return NextResponse.json({ ...order, receiptToken }, { status: 201 });
   } catch (error: any) {
     console.error('Order creation error:', error);
     return NextResponse.json(

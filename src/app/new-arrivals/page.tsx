@@ -5,7 +5,8 @@ import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
 import ShopCatalog from '@/components/storefront/ShopCatalog';
 import SeoContentBlock from '@/components/storefront/SeoContentBlock';
-import { getProducts, getCategories } from '@/lib/db';
+import { getProductsPaginated, getCategories } from '@/lib/db';
+import { parseStorefrontSearchParams } from '@/lib/catalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,13 +23,16 @@ export const metadata: import('next').Metadata = {
   },
 };
 
-export default async function NewArrivalsPage() {
-  const [allProducts, categories] = await Promise.all([
-    getProducts(),
+export default async function NewArrivalsPage(props: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await props.searchParams;
+  const filters = parseStorefrontSearchParams(sp);
+
+  const [catalog, categories] = await Promise.all([
+    getProductsPaginated({ ...filters, isNew: true }),
     getCategories(),
   ]);
-
-  const newArrivals = allProducts.filter((p) => p.isNew);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#ffffff]">
@@ -37,7 +41,12 @@ export default async function NewArrivalsPage() {
       <main className="flex-1">
         <Suspense fallback={<div className="p-20 text-center text-xs font-semibold text-slate-400">Loading catalog...</div>}>
           <ShopCatalog
-            initialProducts={newArrivals}
+            initialProducts={catalog.items}
+            totalCount={catalog.total}
+            currentPage={catalog.page}
+            totalPages={catalog.totalPages}
+            availableBrands={catalog.brands}
+            presetFilter="new-arrivals"
             categories={categories}
             title="New Arrivals"
             subtitle="Latest innovations, runway fashion, and refined workspace tech."

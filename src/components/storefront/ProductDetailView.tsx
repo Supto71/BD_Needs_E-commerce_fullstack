@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -15,11 +15,14 @@ import {
   Plus,
   Minus,
   Check,
+  ChevronLeft,
   ChevronRight,
   ArrowLeft,
   Share2,
   ShoppingCart,
   MessageCircle,
+  Maximize2,
+  X,
 } from 'lucide-react';
 import { Product, ProductVariant, Review } from '@/types';
 import { useCart } from '@/context/CartContext';
@@ -33,6 +36,105 @@ interface ProductDetailViewProps {
   product: Product;
   reviews: Review[];
   relatedProducts: Product[];
+}
+
+interface ThumbnailStripProps {
+  images: string[];
+  activeImage: string;
+  productName: string;
+  onSelect: (img: string) => void;
+  onPrev: () => void;
+  onNext: () => void;
+  variant?: 'light' | 'dark';
+  size?: 'sm' | 'md';
+}
+
+function ProductThumbnailStrip({
+  images,
+  activeImage,
+  productName,
+  onSelect,
+  onPrev,
+  onNext,
+  variant = 'light',
+  size = 'md',
+}: ThumbnailStripProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const activeIdx = images.indexOf(activeImage);
+    if (activeIdx === -1) return;
+    const activeEl = container.children[activeIdx] as HTMLElement | undefined;
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeImage, images]);
+
+  if (images.length <= 1) return null;
+
+  const thumbSize = size === 'sm' ? 'w-16 h-16 rounded-xl' : 'w-20 h-20 rounded-2xl';
+  const arrowBtnCls =
+    variant === 'dark'
+      ? 'w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-[#ffffff] border border-white/15'
+      : 'w-9 h-9 rounded-full bg-[#ffffff] hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-xs';
+
+  return (
+    <div className="flex items-center gap-2 sm:gap-3 w-full">
+      <button
+        type="button"
+        onClick={onPrev}
+        aria-label="Previous image"
+        className={`${arrowBtnCls} flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer`}
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+
+      <div
+        ref={scrollRef}
+        className="flex-1 flex items-center gap-2.5 overflow-x-auto no-scrollbar py-1.5 px-0.5 scroll-smooth"
+      >
+        {images.map((img, idx) => {
+          const isActive = activeImage === img;
+          return (
+            <button
+              key={`${img}-${idx}`}
+              type="button"
+              onClick={() => onSelect(img)}
+              className={`relative ${thumbSize} overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                isActive
+                  ? variant === 'dark'
+                    ? 'border-blue-400 ring-2 ring-blue-400/35 scale-[1.03] opacity-100'
+                    : 'border-blue-600 shadow-md ring-4 ring-blue-500/15 scale-[1.03] opacity-100'
+                  : variant === 'dark'
+                  ? 'border-white/20 opacity-60 hover:opacity-100'
+                  : 'border-slate-200 hover:border-slate-300 opacity-75 hover:opacity-100 bg-slate-50'
+              }`}
+              aria-label={`View image ${idx + 1}`}
+            >
+              <Image
+                src={img}
+                alt={`${productName} Thumbnail ${idx + 1}`}
+                fill
+                className="object-cover"
+                sizes="80px"
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={onNext}
+        aria-label="Next image"
+        className={`${arrowBtnCls} flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer`}
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
 }
 
 export default function ProductDetailView({
@@ -66,6 +168,8 @@ export default function ProductDetailView({
 
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
   const [isAdded, setIsAdded] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const touchStartXRef = useRef<number | null>(null);
 
   // Update image when selected variant changes
   useEffect(() => {
@@ -165,9 +269,34 @@ export default function ProductDetailView({
   const allImages = Array.from(
     new Set([
       ...(selectedVariant?.images || []),
-      ...product.images,
+      ...(product.images || []),
     ])
-  );
+  ).filter((img) => typeof img === 'string' && img.trim() !== '');
+
+  const activeImageIndex = Math.max(0, allImages.indexOf(activeImage));
+
+  const goToPrevImage = useCallback(() => {
+    if (allImages.length <= 1) return;
+    const prevIdx = (activeImageIndex - 1 + allImages.length) % allImages.length;
+    setActiveImage(allImages[prevIdx]);
+  }, [allImages, activeImageIndex]);
+
+  const goToNextImage = useCallback(() => {
+    if (allImages.length <= 1) return;
+    const nextIdx = (activeImageIndex + 1) % allImages.length;
+    setActiveImage(allImages[nextIdx]);
+  }, [allImages, activeImageIndex]);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxOpen(false);
+      if (e.key === 'ArrowLeft') goToPrevImage();
+      if (e.key === 'ArrowRight') goToNextImage();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen, goToPrevImage, goToNextImage]);
 
   return (
     <div className="bg-[#ffffff]">
@@ -175,9 +304,23 @@ export default function ProductDetailView({
       {/* MOBILE EXPERIENCE (lg:hidden) — Full-Bleed Product Image Stage */}
       {/* ======================================================== */}
       <div className="lg:hidden pb-24">
-        {/* Mobile Full-Bleed Hero Image Card */}
-        <div className="p-3">
-          <div className="relative w-full h-[390px] sm:h-[430px] overflow-hidden rounded-[32px] bg-slate-900 border border-slate-200/50 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.12)]">
+        {/* Mobile Full-Bleed Hero Image Card + Bottom Thumbnail Strip */}
+        <div className="p-3 space-y-3">
+          <div
+            onTouchStart={(e) => {
+              touchStartXRef.current = e.touches[0].clientX;
+            }}
+            onTouchEnd={(e) => {
+              if (touchStartXRef.current === null) return;
+              const diff = touchStartXRef.current - e.changedTouches[0].clientX;
+              touchStartXRef.current = null;
+              if (Math.abs(diff) > 45) {
+                if (diff > 0) goToNextImage();
+                else goToPrevImage();
+              }
+            }}
+            className="relative w-full h-[390px] sm:h-[430px] overflow-hidden rounded-[32px] bg-slate-900 border border-slate-200/50 shadow-[0_12px_36px_-6px_rgba(0,0,0,0.12)]"
+          >
             {/* The Main Product Image covering the whole container */}
             <Image
               key={`full-bg-${activeImage}`}
@@ -185,12 +328,13 @@ export default function ProductDetailView({
               alt={product.imageAlt?.trim() || `${product.name}${product.brand ? ` - ${product.brand}` : ''} price in Bangladesh`}
               fill
               priority
-              className="object-cover object-center transform transition-all duration-500 scale-100 hover:scale-105"
+              onClick={() => setLightboxOpen(true)}
+              className="object-cover object-center transform transition-all duration-500 scale-100 cursor-zoom-in"
               sizes="(max-width: 768px) 100vw, 600px"
             />
 
             {/* Gradient Overlays for high-contrast legible controls & typography */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/40 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-black/40 pointer-events-none" />
 
             {/* Top Bar with Frosted Glass Floating Buttons */}
             <div className="flex items-center justify-between p-4 z-30 relative">
@@ -203,6 +347,14 @@ export default function ProductDetailView({
               </button>
 
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setLightboxOpen(true)}
+                  className="w-11 h-11 rounded-2xl bg-black/35 hover:bg-black/55 backdrop-blur-xl border border-[#ffffff]/25 shadow-lg flex items-center justify-center text-[#ffffff] active:scale-90 transition-all"
+                  aria-label="Zoom Image"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+
                 <button
                   onClick={() => toggleWishlist(product.id)}
                   className={`w-11 h-11 rounded-2xl backdrop-blur-xl border shadow-lg flex items-center justify-center transition-all active:scale-90 ${
@@ -225,7 +377,29 @@ export default function ProductDetailView({
               </div>
             </div>
 
-            {/* Bottom Floating Title, Category & Dots inside the Hero Image Stage */}
+            {/* Mobile Floating Prev / Next Arrows */}
+            {allImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={goToPrevImage}
+                  aria-label="Previous image"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-black/40 hover:bg-black/65 backdrop-blur-md border border-[#ffffff]/20 text-[#ffffff] flex items-center justify-center active:scale-90 transition-all"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={goToNextImage}
+                  aria-label="Next image"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full bg-black/40 hover:bg-black/65 backdrop-blur-md border border-[#ffffff]/20 text-[#ffffff] flex items-center justify-center active:scale-90 transition-all"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </>
+            )}
+
+            {/* Bottom Floating Title, Category & Counter inside the Hero Image Stage */}
             <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between gap-3 pointer-events-none">
               <div className="space-y-1 max-w-[78%]">
                 <span className="inline-block px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#ffffff]/25 text-[#ffffff] backdrop-blur-md border border-[#ffffff]/30 shadow-xs">
@@ -241,25 +415,28 @@ export default function ProductDetailView({
                 )}
               </div>
 
-              {/* Multi-Image Indicator Dots */}
               {allImages.length > 1 && (
-                <div className="flex items-center gap-1.5 pointer-events-auto bg-black/40 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-[#ffffff]/20">
-                  {allImages.map((img, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveImage(img)}
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        activeImage === img
-                          ? 'w-5 bg-[#ffffff] shadow-xs'
-                          : 'w-2 bg-[#ffffff]/40 hover:bg-[#ffffff]/70'
-                      }`}
-                      aria-label={`View image ${idx + 1}`}
-                    />
-                  ))}
+                <div className="px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-md border border-[#ffffff]/20 text-[#ffffff] text-[11px] font-bold shrink-0">
+                  {activeImageIndex + 1} / {allImages.length}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Mobile Horizontal Thumbnail Strip */}
+          {allImages.length > 1 && (
+            <div className="px-1">
+              <ProductThumbnailStrip
+                images={allImages}
+                activeImage={activeImage}
+                productName={product.name}
+                onSelect={setActiveImage}
+                onPrev={goToPrevImage}
+                onNext={goToNextImage}
+                size="sm"
+              />
+            </div>
+          )}
         </div>
 
         {/* Mobile Product Info Section */}
@@ -624,57 +801,76 @@ export default function ProductDetailView({
         {/* Main Product Container */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
-            {/* Left Column: Image Gallery with Ambient Background Glow */}
+            {/* Left Column: Main Product Image + Horizontal Thumbnail Strip */}
             <div className="lg:col-span-7 flex flex-col gap-10">
-              <div className="flex flex-col-reverse md:flex-row gap-4">
-              {/* Thumbnails list */}
-              {allImages.length > 1 && (
-                <div className="flex md:flex-col gap-3 overflow-x-auto md:overflow-y-auto no-scrollbar md:max-h-[560px] pb-2 md:pb-0">
-                  {allImages.map((img, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveImage(img)}
-                      className={`relative w-20 h-20 rounded-2xl overflow-hidden shrink-0 border-2 transition-all ${
-                        activeImage === img
-                          ? 'border-blue-600 shadow-md ring-4 ring-blue-500/15 scale-102'
-                          : 'border-slate-200/80 hover:border-slate-300 opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      <Image
-                        src={img}
-                        alt={`${product.name} Thumbnail ${idx + 1}`}
-                        fill
-                        className="object-cover"
-                        sizes="80px"
-                      />
-                    </button>
-                  ))}
+              <div className="flex flex-col gap-4">
+                {/* Main Stage View Image */}
+                <div className="relative w-full aspect-square rounded-[32px] overflow-hidden bg-slate-900 border border-slate-200/60 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.12)] group">
+                  <Image
+                    key={`desktop-img-${activeImage}`}
+                    src={activeImage}
+                    alt={product.imageAlt?.trim() || `${product.name}${product.brand ? ` - ${product.brand}` : ''} price in Bangladesh`}
+                    fill
+                    priority
+                    onClick={() => setLightboxOpen(true)}
+                    className="object-cover object-center transform transition-all duration-700 group-hover:scale-105 cursor-zoom-in"
+                    sizes="(max-width: 1024px) 100vw, 700px"
+                  />
+
+                  {/* Subtle vignette/gradient at top & bottom for depth */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10 pointer-events-none opacity-60 group-hover:opacity-40 transition-opacity" />
+
+                  {/* Zoom / Fullscreen Button */}
+                  <button
+                    type="button"
+                    onClick={() => setLightboxOpen(true)}
+                    aria-label="Open fullscreen view"
+                    className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/45 hover:bg-black/70 backdrop-blur-md border border-[#ffffff]/20 text-[#ffffff] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
+
+                  {/* Prev / Next Overlay Arrows */}
+                  {allImages.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={goToPrevImage}
+                        aria-label="Previous image"
+                        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-[#ffffff]/90 hover:bg-[#ffffff] text-[#0B132B] shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all active:scale-90 cursor-pointer"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={goToNextImage}
+                        aria-label="Next image"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-[#ffffff]/90 hover:bg-[#ffffff] text-[#0B132B] shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all active:scale-90 cursor-pointer"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </>
+                  )}
+
+                  {/* Multi-Image Counter Pill at Bottom Right */}
+                  {allImages.length > 1 && (
+                    <div className="absolute bottom-4 right-4 z-20 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-[#ffffff]/20 text-[#ffffff] text-xs font-bold shadow-md">
+                      {activeImageIndex + 1} / {allImages.length}
+                    </div>
+                  )}
                 </div>
-              )}
 
-              {/* Main Stage View Image — Full-Bleed Cover Filling Entire Container */}
-              <div className="relative flex-1 aspect-square rounded-[32px] overflow-hidden bg-slate-900 border border-slate-200/60 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.12)] group">
-                <Image
-                  key={`desktop-img-${activeImage}`}
-                  src={activeImage}
-                  alt={product.imageAlt?.trim() || `${product.name}${product.brand ? ` - ${product.brand}` : ''} price in Bangladesh`}
-                  fill
-                  priority
-                  className="object-cover object-center transform transition-all duration-700 group-hover:scale-105"
-                  sizes="(max-width: 1024px) 100vw, 700px"
+                {/* Horizontal Thumbnail Carousel Below Main Image */}
+                <ProductThumbnailStrip
+                  images={allImages}
+                  activeImage={activeImage}
+                  productName={product.name}
+                  onSelect={setActiveImage}
+                  onPrev={goToPrevImage}
+                  onNext={goToNextImage}
+                  size="md"
                 />
-
-                {/* Subtle vignette/gradient at top & bottom for depth */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10 pointer-events-none opacity-60 group-hover:opacity-40 transition-opacity" />
-
-                {/* Multi-Image Counter Pill at Bottom Right if multiple images exist */}
-                {allImages.length > 1 && (
-                  <div className="absolute bottom-4 right-4 z-20 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md border border-[#ffffff]/20 text-[#ffffff] text-xs font-bold shadow-md">
-                    {allImages.indexOf(activeImage) + 1} / {allImages.length}
-                  </div>
-                )}
               </div>
-            </div>
 
             {/* Technical Information & Description */}
             <div className="space-y-6">
@@ -1075,6 +1271,86 @@ export default function ProductDetailView({
             </div>
           </div>
         </section>
+      )}
+
+      {/* Fullscreen Image Lightbox Modal */}
+      {lightboxOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/92 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <div className="flex items-center justify-between text-[#ffffff]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <span className="text-xs sm:text-sm font-bold truncate max-w-[240px] sm:max-w-md">
+                {product.name}
+              </span>
+              {allImages.length > 1 && (
+                <span className="px-2.5 py-0.5 rounded-full bg-white/15 text-[11px] font-bold">
+                  {activeImageIndex + 1} / {allImages.length}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setLightboxOpen(false)}
+              aria-label="Close fullscreen gallery"
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div
+            className="relative flex-1 my-4 flex items-center justify-center max-w-4xl w-full mx-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative w-full h-full max-h-[70vh]">
+              <Image
+                src={activeImage}
+                alt={product.name}
+                fill
+                className="object-contain"
+                sizes="100vw"
+              />
+            </div>
+
+            {allImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={goToPrevImage}
+                  aria-label="Previous image"
+                  className="absolute left-0 sm:left-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-[#ffffff] flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={goToNextImage}
+                  aria-label="Next image"
+                  className="absolute right-0 sm:right-2 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-[#ffffff] flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {allImages.length > 1 && (
+            <div className="max-w-xl w-full mx-auto" onClick={(e) => e.stopPropagation()}>
+              <ProductThumbnailStrip
+                images={allImages}
+                activeImage={activeImage}
+                productName={product.name}
+                onSelect={setActiveImage}
+                onPrev={goToPrevImage}
+                onNext={goToNextImage}
+                variant="dark"
+                size="sm"
+              />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   SlidersHorizontal,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
   Star,
   Search,
   RotateCcw,
@@ -15,18 +18,45 @@ import ProductCard from './ProductCard';
 import { formatPrice } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 
+const PAGE_SIZE = 24;
+
 interface ShopCatalogProps {
   initialProducts: Product[];
   categories: Category[];
+  totalCount?: number;
+  currentPage?: number;
+  totalPages?: number;
+  availableBrands?: string[];
+  presetFilter?: 'best-sellers' | 'new-arrivals';
   initialCategorySlug?: string;
   initialSearchQuery?: string;
   title?: string;
   subtitle?: string;
 }
 
+function getPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages: (number | 'ellipsis')[] = [1];
+  const left = Math.max(2, current - 1);
+  const right = Math.min(total - 1, current + 1);
+
+  if (left > 2) pages.push('ellipsis');
+  for (let p = left; p <= right; p++) pages.push(p);
+  if (right < total - 1) pages.push('ellipsis');
+  pages.push(total);
+  return pages;
+}
+
 export default function ShopCatalog({
   initialProducts,
   categories,
+  totalCount: initialTotalCount,
+  currentPage: initialCurrentPage,
+  totalPages: initialTotalPages,
+  availableBrands,
+  presetFilter,
   initialCategorySlug,
   initialSearchQuery,
   title,
@@ -35,8 +65,25 @@ export default function ShopCatalog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLanguage();
+  const catalogTopRef = useRef<HTMLDivElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isFirstRenderRef = useRef(true);
 
   // State
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [totalCount, setTotalCount] = useState<number>(initialTotalCount ?? initialProducts.length);
+  const [page, setPage] = useState<number>(initialCurrentPage ?? 1);
+  const [totalPages, setTotalPages] = useState<number>(
+    initialTotalPages ?? Math.max(1, Math.ceil((initialTotalCount ?? initialProducts.length) / PAGE_SIZE))
+  );
+  const [brandsList, setBrandsList] = useState<string[]>(() => {
+    if (availableBrands && availableBrands.length > 0) return availableBrands;
+    const set = new Set<string>();
+    initialProducts.forEach((p) => p.brand && set.add(p.brand));
+    return Array.from(set);
+  });
+  const [loading, setLoading] = useState<boolean>(false);
+
   const [selectedCategory, setSelectedCategory] = useState<string>(
     initialCategorySlug || searchParams.get('category') || ''
   );
@@ -46,22 +93,37 @@ export default function ShopCatalog({
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>(
     searchParams.get('subcategory') || ''
   );
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 200000]);
+  const [priceRange, setPriceRange] = useState<[number, number]>(() => [
+    Number(searchParams.get('minPrice') || 0),
+    Number(searchParams.get('maxPrice') || 200000),
+  ]);
+  const [debouncedMaxPrice, setDebouncedMaxPrice] = useState<number>(priceRange[1]);
   const [minRating, setMinRating] = useState<number>(0);
-  const [inStockOnly, setInStockOnly] = useState<boolean>(false);
+  const [inStockOnly, setInStockOnly] = useState<boolean>(
+    searchParams.get('inStock') === 'true'
+  );
   const [selectedColor, setSelectedColor] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>(initialSearchQuery || '');
+  const [searchQuery, setSearchQuery] = useState<string>(
+    initialSearchQuery || searchParams.get('search') || searchParams.get('q') || ''
+  );
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(searchQuery);
   const [sortBy, setSortBy] = useState<string>(
     searchParams.get('sort') || 'featured'
   );
   const [mobileFilterOpen, setMobileFilterOpen] = useState<boolean>(false);
 
-  // Derive unique brands and colors
-  const brands = useMemo(() => {
-    const set = new Set<string>();
-    initialProducts.forEach((p) => p.brand && set.add(p.brand));
-    return Array.from(set);
-  }, [initialProducts]);
+  // Debounce text search and price slider so typing/dragging doesn't spam API
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedMaxPrice(priceRange[1]), 250);
+    return () => clearTimeout(timer);
+  }, [priceRange]);
+
+  const brands = brandsList;
 
   const subcategories = useMemo(() => {
     if (selectedCategory) {
@@ -91,145 +153,110 @@ export default function ShopCatalog({
     return Array.from(set);
   }, [categories, selectedCategory]);
 
-  const colors = useMemo(() => {
-    const map = new Map<string, string>();
-    initialProducts.forEach((p) => {
-      p.variants?.forEach((v) => {
-        if (v.colorName && v.colorHex && !map.has(v.colorName)) {
-          map.set(v.colorName, v.colorHex);
-        }
-      });
-    });
-    return Array.from(map.entries()).map(([name, hex]) => ({ name, hex }));
-  }, [initialProducts]);
+  const fetchCatalogPage = useCallback(
+    async (
+      targetPage: number,
+      opts?: { historyMode?: 'push' | 'replace' | 'none'; scrollToTop?: boolean }
+    ) => {
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
-  // Filter & Sort Logic
-  const filteredProducts = useMemo(() => {
-    let list = [...initialProducts];
+      setLoading(true);
+      try {
+        const apiParams = new URLSearchParams();
+        apiParams.set('paginated', 'true');
+        apiParams.set('page', String(targetPage));
+        apiParams.set('limit', String(PAGE_SIZE));
+        if (selectedCategory) apiParams.set('category', selectedCategory);
+        if (selectedSubcategory) apiParams.set('subcategory', selectedSubcategory);
+        if (selectedBrand) apiParams.set('brand', selectedBrand);
+        if (debouncedSearch.trim()) apiParams.set('search', debouncedSearch.trim());
+        if (priceRange[0] > 0) apiParams.set('minPrice', String(priceRange[0]));
+        if (debouncedMaxPrice < 200000) apiParams.set('maxPrice', String(debouncedMaxPrice));
+        if (minRating > 0) apiParams.set('rating', String(minRating));
+        if (inStockOnly) apiParams.set('inStock', 'true');
+        if (selectedColor) apiParams.set('color', selectedColor);
+        if (sortBy && sortBy !== 'featured') apiParams.set('sortBy', sortBy);
+        if (presetFilter === 'best-sellers') apiParams.set('isBestSeller', 'true');
+        if (presetFilter === 'new-arrivals') apiParams.set('isNew', 'true');
 
-    if (searchQuery.trim() && searchQuery.trim().toLowerCase() !== initialSearchQuery?.toLowerCase().trim()) {
-      const originalTerms = searchQuery.toLowerCase().trim().split(/\s+/);
-      const synonyms: Record<string, string[]> = {
-        'clothes': ['apparel', 'fashion', 't-shirt', 'shirt', 'pant', 'wear'],
-        'cloth': ['apparel', 'fashion', 't-shirt', 'shirt', 'pant', 'wear'],
-        'clothing': ['apparel', 'fashion', 't-shirt', 'shirt', 'pant', 'wear'],
-        'gadget': ['electronic', 'smart', 'device', 'audio'],
-        'gadgets': ['electronic', 'smart', 'device', 'audio'],
-        'skin': ['skincare', 'serum', 'beauty', 'grooming', 'lotion'],
-        'shoe': ['sneaker', 'footwear', 'boot', 'runner'],
-        'shoes': ['sneaker', 'footwear', 'boot', 'runner'],
-        'pc': ['computer', 'laptop', 'desktop', 'workstation'],
-        'computer': ['pc', 'laptop', 'desktop', 'workstation'],
-        'phone': ['smartphone', 'mobile', 'cellphone'],
-        'bag': ['briefcase', 'backpack', 'tote', 'luggage', 'pouch'],
-        'bags': ['briefcase', 'backpack', 'tote', 'luggage', 'pouch'],
-      };
-
-      const termGroups = originalTerms.map(term => {
-        const group = [term];
-        if (synonyms[term]) group.push(...synonyms[term]);
-        return group.map(t => {
-          let stem = t;
-          if (stem.length > 3) {
-            if (stem.endsWith('ies')) stem = stem.slice(0, -3) + 'y';
-            else if (stem.endsWith('es') && !stem.endsWith('shoes')) stem = stem.slice(0, -2);
-            else if (stem.endsWith('s') && !stem.endsWith('ss')) stem = stem.slice(0, -1);
-            else if (stem.endsWith('ing')) stem = stem.slice(0, -3);
-            else if (stem.endsWith('e')) stem = stem.slice(0, -1);
+        // Keep browser URL clean & bookmarkable
+        if (opts?.historyMode !== 'none' && typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams();
+          if (targetPage > 1) urlParams.set('page', String(targetPage));
+          if (selectedSubcategory) urlParams.set('subcategory', selectedSubcategory);
+          if (selectedBrand) urlParams.set('brand', selectedBrand);
+          if (debouncedSearch.trim()) {
+            urlParams.set(window.location.pathname === '/search' ? 'q' : 'search', debouncedSearch.trim());
           }
-          return stem.length < 3 ? t : stem;
+          if (debouncedMaxPrice < 200000) urlParams.set('maxPrice', String(debouncedMaxPrice));
+          if (inStockOnly) urlParams.set('inStock', 'true');
+          if (sortBy && sortBy !== 'featured') urlParams.set('sort', sortBy);
+          const qs = urlParams.toString();
+          const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+          if (opts?.historyMode === 'push') {
+            window.history.pushState(null, '', nextUrl);
+          } else {
+            window.history.replaceState(null, '', nextUrl);
+          }
+        }
+
+        const res = await fetch(`/api/products?${apiParams.toString()}`, {
+          signal: controller.signal,
         });
-      });
+        if (!res.ok) throw new Error('Failed to fetch catalog');
+        const data = await res.json();
 
-      list = list.filter((p) => {
-        return termGroups.every(groupStems => 
-          groupStems.some(stem =>
-            p.name.toLowerCase().includes(stem) ||
-            p.brand.toLowerCase().includes(stem) ||
-            p.categoryName.toLowerCase().includes(stem) ||
-            (p.shortDescription && p.shortDescription.toLowerCase().includes(stem)) ||
-            p.tags.some((t) => t.toLowerCase().includes(stem))
-          )
-        );
-      });
+        setProducts(Array.isArray(data.items) ? data.items : []);
+        setTotalCount(typeof data.total === 'number' ? data.total : 0);
+        setPage(typeof data.page === 'number' ? data.page : targetPage);
+        setTotalPages(typeof data.totalPages === 'number' ? data.totalPages : 1);
+        if (Array.isArray(data.brands)) {
+          setBrandsList(data.brands);
+        }
+
+        if (opts?.scrollToTop && catalogTopRef.current) {
+          catalogTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } catch (err: unknown) {
+        if ((err as { name?: string })?.name !== 'AbortError') {
+          console.error('Catalog fetch error:', err);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [
+      selectedCategory,
+      selectedSubcategory,
+      selectedBrand,
+      debouncedSearch,
+      priceRange,
+      debouncedMaxPrice,
+      minRating,
+      inStockOnly,
+      selectedColor,
+      sortBy,
+      presetFilter,
+    ]
+  );
+
+  // Trigger server-side page 1 fetch whenever filters/sort change (skipping initial SSR mount)
+  useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
     }
+    fetchCatalogPage(1, { historyMode: 'replace' });
+  }, [fetchCatalogPage]);
 
-    if (selectedCategory) {
-      list = list.filter(
-        (p) =>
-          p.categoryId === selectedCategory ||
-          categories.find((c) => c.slug === selectedCategory)?.id === p.categoryId
-      );
-    }
-
-    if (selectedBrand) {
-      list = list.filter((p) => p.brand === selectedBrand);
-    }
-
-    if (selectedSubcategory) {
-      list = list.filter((p) => p.subcategoryName === selectedSubcategory);
-    }
-
-    list = list.filter(
-      (p) => p.basePrice >= priceRange[0] && p.basePrice <= priceRange[1]
-    );
-
-    if (minRating > 0) {
-      list = list.filter((p) => p.rating >= minRating);
-    }
-
-    if (inStockOnly) {
-      list = list.filter((p) => p.stock > 0);
-    }
-
-    if (selectedColor) {
-      list = list.filter((p) =>
-        p.variants.some((v) =>
-          v.colorName.toLowerCase().includes(selectedColor.toLowerCase())
-        )
-      );
-    }
-
-    // Sort
-    switch (sortBy) {
-      case 'best-selling':
-        list.sort((a, b) => b.salesCount - a.salesCount);
-        break;
-      case 'newest':
-        list.sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        break;
-      case 'price-low-high':
-        list.sort((a, b) => a.basePrice - b.basePrice);
-        break;
-      case 'price-high-low':
-        list.sort((a, b) => b.basePrice - a.basePrice);
-        break;
-      case 'rating':
-        list.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'featured':
-      default:
-        list.sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
-        break;
-    }
-
-    return list;
-  }, [
-    initialProducts,
-    searchQuery,
-    selectedCategory,
-    selectedSubcategory,
-    selectedBrand,
-    priceRange,
-    minRating,
-    inStockOnly,
-    selectedColor,
-    sortBy,
-    categories,
-  ]);
+  const goToPage = (nextPage: number) => {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === page || loading) return;
+    fetchCatalogPage(nextPage, { historyMode: 'push', scrollToTop: true });
+  };
 
   const resetFilters = () => {
     if (initialCategorySlug) {
@@ -240,15 +267,21 @@ export default function ShopCatalog({
     setSelectedSubcategory('');
     setSelectedBrand('');
     setPriceRange([0, 200000]);
+    setDebouncedMaxPrice(200000);
     setMinRating(0);
     setInStockOnly(false);
     setSelectedColor('');
     setSearchQuery('');
+    setDebouncedSearch('');
     setSortBy('featured');
     if (searchParams.toString()) {
       router.push(window.location.pathname);
     }
   };
+
+  const startItem = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endItem = Math.min(page * PAGE_SIZE, totalCount);
+  const pageNumbers = useMemo(() => getPageNumbers(page, totalPages), [page, totalPages]);
 
   const activeFilterCount =
     (selectedCategory ? 1 : 0) +
@@ -261,7 +294,7 @@ export default function ShopCatalog({
     (searchQuery ? 1 : 0);
 
   return (
-    <div className="bg-[#ffffff] min-h-screen py-8 sm:py-12">
+    <div ref={catalogTopRef} className="bg-[#ffffff] min-h-screen py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Header & Context Title */}
         <div className="pb-8 border-b border-slate-100">
@@ -320,8 +353,10 @@ export default function ShopCatalog({
             </button>
 
             {/* Results Counter */}
-            <span className="text-xs text-slate-500 font-medium">
-              {t('showingResults')} <strong className="text-slate-900">{filteredProducts.length}</strong> {t('productsCount')}
+            <span className="text-xs text-slate-500 font-medium flex items-center gap-2">
+              {t('showingResults')} <strong className="text-slate-900">{startItem > 0 ? `${startItem}–${endItem}` : 0}</strong> of{' '}
+              <strong className="text-slate-900">{totalCount}</strong> {t('productsCount')}
+              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />}
             </span>
           </div>
 
@@ -572,7 +607,7 @@ export default function ShopCatalog({
 
           {/* Products Grid Area */}
           <div className="lg:col-span-3">
-            {filteredProducts.length === 0 ? (
+            {!loading && products.length === 0 ? (
               <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-slate-100 p-8">
                 <div className="w-16 h-16 rounded-full bg-[#ffffff] shadow-sm flex items-center justify-center text-slate-400 mx-auto mb-4">
                   <Search className="w-8 h-8" />
@@ -591,11 +626,71 @@ export default function ShopCatalog({
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+              <>
+                <div
+                  className={`grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-6 transition-opacity duration-200 ${
+                    loading ? 'opacity-50 pointer-events-none' : 'opacity-100'
+                  }`}
+                >
+                  {products.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+
+                {/* Pagination Bar */}
+                {totalPages > 1 && (
+                  <div className="mt-10 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <p className="text-xs text-slate-500 font-medium">
+                      Page <strong className="text-[#0B132B]">{page}</strong> of{' '}
+                      <strong className="text-[#0B132B]">{totalPages}</strong> ({totalCount} {t('productsCount')})
+                    </p>
+
+                    <div className="flex flex-wrap items-center justify-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => goToPage(page - 1)}
+                        disabled={page <= 1 || loading}
+                        className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-[#ffffff] text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        Previous
+                      </button>
+
+                      {pageNumbers.map((item, idx) =>
+                        item === 'ellipsis' ? (
+                          <span key={`ellipsis-${idx}`} className="px-2 text-xs text-slate-400 font-bold">
+                            ...
+                          </span>
+                        ) : (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => goToPage(item)}
+                            disabled={loading}
+                            className={`min-w-[36px] h-9 px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                              item === page
+                                ? 'bg-[#0B132B] text-[#ffffff] shadow-sm'
+                                : 'border border-slate-200 bg-[#ffffff] text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        )
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => goToPage(page + 1)}
+                        disabled={page >= totalPages || loading}
+                        className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-[#ffffff] text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -763,12 +858,12 @@ export default function ShopCatalog({
             </div>
             
             <div className="mt-8 px-4">
-               <button
+                <button
                   onClick={() => setMobileFilterOpen(false)}
                   className="w-full py-3 bg-[#0B132B] hover:bg-blue-600 text-[#ffffff] font-bold rounded-xl transition-colors shadow-md text-sm"
                 >
-                  View Results ({filteredProducts.length})
-               </button>
+                  View Results ({totalCount})
+                </button>
             </div>
           </div>
         </div>

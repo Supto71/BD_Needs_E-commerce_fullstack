@@ -6,7 +6,8 @@ import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
 import ShopCatalog from '@/components/storefront/ShopCatalog';
 import SeoContentBlock from '@/components/storefront/SeoContentBlock';
-import { getProducts, getCategories, getCategoryBySlug } from '@/lib/db';
+import { getProductsPaginated, getCategories, getCategoryBySlug } from '@/lib/db';
+import { parseStorefrontSearchParams } from '@/lib/catalog';
 import { SITE_URL } from '@/lib/site';
 import { breadcrumbJsonLd } from '@/lib/seo';
 
@@ -30,16 +31,18 @@ export async function generateMetadata(props: {
 
 export default async function CategoryPage(props: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { slug } = await props.params;
+  const [{ slug }, sp] = await Promise.all([props.params, props.searchParams]);
   const category = await getCategoryBySlug(slug);
 
   if (!category) {
     notFound();
   }
 
-  const [products, categories] = await Promise.all([
-    getProducts({ category: category.id }),
+  const filters = parseStorefrontSearchParams(sp);
+  const [catalog, categories] = await Promise.all([
+    getProductsPaginated({ ...filters, category: category.id }),
     getCategories(),
   ]);
 
@@ -61,7 +64,12 @@ export default async function CategoryPage(props: {
       <main className="flex-1">
         <Suspense fallback={<div className="p-20 text-center text-xs font-semibold text-slate-400">Loading department...</div>}>
           <ShopCatalog
-            initialProducts={products}
+            key={category.id}
+            initialProducts={catalog.items}
+            totalCount={catalog.total}
+            currentPage={catalog.page}
+            totalPages={catalog.totalPages}
+            availableBrands={catalog.brands}
             categories={categories}
             initialCategorySlug={category.id}
             title={category.name}

@@ -68,11 +68,12 @@ export default function Header() {
 
     setIsSearching(true);
     const timeout = setTimeout(() => {
-      fetch(`/api/products?search=${encodeURIComponent(searchQuery.trim())}`)
+      fetch(`/api/products?search=${encodeURIComponent(searchQuery.trim())}&paginated=true&limit=5`)
         .then((res) => res.json())
         .then((data) => {
-          if (Array.isArray(data)) {
-            setSearchResults(data.slice(0, 5));
+          const items = Array.isArray(data) ? data : data?.items;
+          if (Array.isArray(items)) {
+            setSearchResults(items.slice(0, 5));
           }
         })
         .catch(() => {})

@@ -9,16 +9,16 @@ import NewArrivalsSection from '@/components/storefront/NewArrivalsSection';
 import Footer from '@/components/storefront/Footer';
 import MobileBottomNav from '@/components/storefront/MobileBottomNav';
 import SeoContentBlock from '@/components/storefront/SeoContentBlock';
-import { getBanners, getCategories, getProducts } from '@/lib/db';
+import { getBanners, getCategories, getHomepageProducts } from '@/lib/db';
 import { SITE_URL, SITE_NAME } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [banners, categories, products] = await Promise.all([
+  const [banners, categories, homepageProducts] = await Promise.all([
     getBanners(),
     getCategories(),
-    getProducts(),
+    getHomepageProducts(),
   ]);
 
   const jsonLd = {
@@ -72,13 +72,13 @@ export default async function HomePage() {
         <CategoryCarousel categories={categories} />
 
         {/* Best Sellers Section */}
-        <BestSellersSection products={products} />
+        <BestSellersSection products={homepageProducts.bestSellers} />
 
         {/* Editorial Campaign Banner */}
         <CampaignBanner banner={banners.find(b => b.type === 'CAMPAIGN')} />
 
         {/* New Arrivals Section */}
-        <NewArrivalsSection products={products} />
+        <NewArrivalsSection products={homepageProducts.newArrivals} />
 
       </main>
 

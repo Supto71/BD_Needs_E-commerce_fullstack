@@ -18,6 +18,9 @@ import { Product } from '@/types';
 import { formatPrice } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import InfiniteScrollTrigger from '@/components/admin/InfiniteScrollTrigger';
+
+const ADMIN_LIMIT = 24;
 
 export default function AdminProductsPage() {
   const { t } = useLanguage();
@@ -25,24 +28,48 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchProducts = () => {
-    setLoading(true);
-    fetch('/api/products?admin=true')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setProducts(data);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const fetchProductsPage = async (targetPage: number, append: boolean) => {
+    if (append) setLoadingMore(true);
+
+    try {
+      const params = new URLSearchParams({
+        admin: 'true',
+        paginated: 'true',
+        page: String(targetPage),
+        limit: String(ADMIN_LIMIT),
+      });
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+      if (categoryFilter) params.set('category', categoryFilter);
+
+      const res = await fetch(`/api/products?${params.toString()}`);
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      setProducts((prev) => (append ? [...prev, ...items] : items));
+      setPage(data.page || targetPage);
+      setTotalCount(typeof data.total === 'number' ? data.total : items.length);
+      setHasMore(Boolean(data.hasMore));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   };
 
   useEffect(() => {
-    fetchProducts();
     fetch('/api/categories?admin=true')
       .then((res) => res.json())
       .then((data) => {
@@ -51,29 +78,52 @@ export default function AdminProductsPage() {
       .catch(console.error);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({
+      admin: 'true',
+      paginated: 'true',
+      page: '1',
+      limit: String(ADMIN_LIMIT),
+    });
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+    if (categoryFilter) params.set('category', categoryFilter);
+
+    fetch(`/api/products?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        const items = Array.isArray(data.items) ? data.items : [];
+        setProducts(items);
+        setPage(data.page || 1);
+        setTotalCount(typeof data.total === 'number' ? data.total : items.length);
+        setHasMore(Boolean(data.hasMore));
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedSearch, categoryFilter]);
+
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete product "${name}"?`)) return;
 
     try {
       const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        setProducts(products.filter((p) => p.id !== id));
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        setTotalCount((prev) => Math.max(0, prev - 1));
       }
     } catch (e) {
       console.error('Delete error', e);
     }
   };
 
-  const filtered = products.filter((p) => {
-    const matchesSearch =
-      !search ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.sku.toLowerCase().includes(search.toLowerCase()) ||
-      p.brand.toLowerCase().includes(search.toLowerCase());
-
-    const matchesCat = !categoryFilter || p.categoryId === categoryFilter;
-    return matchesSearch && matchesCat;
-  });
+  const filtered = products;
 
   return (
     <div className="space-y-6">
@@ -252,6 +302,14 @@ export default function AdminProductsPage() {
             </tbody>
           </table>
         </div>
+        <InfiniteScrollTrigger
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={() => fetchProductsPage(page + 1, true)}
+          loadedCount={filtered.length}
+          totalCount={totalCount}
+          itemLabel="products"
+        />
       </div>
     </div>
   );

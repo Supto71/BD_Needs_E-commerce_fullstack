@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Package, Truck, ArrowRight } from 'lucide-react';
+import { Package, Truck, ArrowRight, Download } from 'lucide-react';
 import AnnouncementBar from '@/components/storefront/AnnouncementBar';
 import Header from '@/components/storefront/Header';
 import Footer from '@/components/storefront/Footer';
@@ -16,27 +16,70 @@ import { formatPrice, formatDate } from '@/lib/utils';
 export default function OrdersPage() {
   const { user, isAuthLoading } = useAuth();
   const { t } = useLanguage();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<(Order & { receiptToken?: string })[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (isAuthLoading) return; // Wait for auth to finish checking local storage
 
-    if (!user) {
-      setLoading(false);
-      return; // Do not fetch if not logged in
-    }
-
-    setLoading(true);
-    fetch(`/api/orders?userId=${user.id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setOrders(data);
+    const loadOrders = async () => {
+      setLoading(true);
+      try {
+        let fetchedUserOrders: (Order & { receiptToken?: string })[] = [];
+        if (user) {
+          const res = await fetch(`/api/orders?userId=${user.id}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            fetchedUserOrders = data;
+          }
         }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+
+        // Also check recent guest orders saved in localStorage on this browser
+        let guestEntries: { id: string; token: string }[] = [];
+        try {
+          const raw = localStorage.getItem('bdneeds_guest_orders');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) guestEntries = parsed;
+          }
+        } catch {}
+
+        const existingIds = new Set(fetchedUserOrders.map((o) => o.id));
+        const missingGuests = guestEntries.filter(
+          (g) => g?.id && g?.token && !existingIds.has(g.id)
+        );
+
+        const guestOrders = (
+          await Promise.all(
+            missingGuests.map(async (g) => {
+              try {
+                const res = await fetch(
+                  `/api/orders/${g.id}?token=${encodeURIComponent(g.token)}`
+                );
+                if (!res.ok) return null;
+                const orderData = await res.json();
+                if (orderData && !orderData.error) {
+                  return { ...orderData, receiptToken: g.token };
+                }
+              } catch {}
+              return null;
+            })
+          )
+        ).filter(Boolean) as (Order & { receiptToken?: string })[];
+
+        const combined = [...fetchedUserOrders, ...guestOrders].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setOrders(combined);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadOrders();
   }, [user, isAuthLoading]);
 
   return (
@@ -112,7 +155,14 @@ export default function OrdersPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <Link
+                        href={`/invoice/${order.id}?print=1${order.receiptToken ? `&token=${encodeURIComponent(order.receiptToken)}` : ''}`}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-[#ffffff] rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download Chalan
+                      </Link>
                       <Link
                         href={`/track-order?orderId=${order.orderNumber}`}
                         className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"

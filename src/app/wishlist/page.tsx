@@ -22,7 +22,13 @@ export default function WishlistPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/products')
+    if (wishlistIds.length === 0) {
+      setProducts([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    fetch(`/api/products?ids=${encodeURIComponent(wishlistIds.join(','))}`)
       .then((res) => res.json())
       .then((allProducts: Product[]) => {
         if (Array.isArray(allProducts)) {

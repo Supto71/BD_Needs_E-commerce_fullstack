@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { createReceiptToken, sendOrderChalanEmail } from '@/lib/chalan';
 
 export const dynamic = 'force-dynamic';
 
-async function verifyAndProcessPayment(invoiceId: string, orderId: string) {
+async function verifyAndProcessPayment(invoiceId: string, orderId: string, origin?: string) {
   const apiKey = process.env.UDDOKTAPAY_API_KEY;
   const baseUrl = process.env.UDDOKTAPAY_BASE_URL;
 
@@ -40,7 +41,7 @@ async function verifyAndProcessPayment(invoiceId: string, orderId: string) {
         return false;
       }
 
-      await prisma.order.update({
+      const updatedOrder = await prisma.order.update({
         where: { id: orderId },
         data: {
           paymentStatus: 'PAID',
@@ -48,7 +49,9 @@ async function verifyAndProcessPayment(invoiceId: string, orderId: string) {
           uddoktaTransactionId: data.transaction_id || null,
           paymentDetails: data,
         },
+        include: { items: true },
       });
+      await sendOrderChalanEmail(updatedOrder, origin);
       return true;
     } else if (data.status === 'FAILED' || data.status === 'CANCELED') {
       await prisma.order.update({
@@ -76,12 +79,14 @@ export async function GET(request: Request) {
   const origin = new URL(request.url).origin;
   
   if (orderId && invoiceId) {
-    await verifyAndProcessPayment(invoiceId, orderId);
-    return NextResponse.redirect(`${origin}/order-success?orderId=${orderId}`, 302);
+    await verifyAndProcessPayment(invoiceId, orderId, origin);
+    const token = createReceiptToken(orderId);
+    return NextResponse.redirect(`${origin}/order-success?orderId=${orderId}&token=${token}`, 302);
   }
   
   if (orderId) {
-    return NextResponse.redirect(`${origin}/order-success?orderId=${orderId}`, 302);
+    const token = createReceiptToken(orderId);
+    return NextResponse.redirect(`${origin}/order-success?orderId=${orderId}&token=${token}`, 302);
   }
   return NextResponse.redirect(`${origin}/`, 302);
 }
@@ -104,14 +109,15 @@ export async function POST(request: Request) {
     }
 
     if (orderId && invoiceId) {
-      await verifyAndProcessPayment(invoiceId, orderId);
+      await verifyAndProcessPayment(invoiceId, orderId, origin);
     }
   } catch (e) {
     console.error('Error parsing success POST data', e);
   }
   
   if (orderId) {
-    return NextResponse.redirect(`${origin}/order-success?orderId=${orderId}`, 303);
+    const token = createReceiptToken(orderId);
+    return NextResponse.redirect(`${origin}/order-success?orderId=${orderId}&token=${token}`, 303);
   }
   return NextResponse.redirect(`${origin}/`, 303);
 }

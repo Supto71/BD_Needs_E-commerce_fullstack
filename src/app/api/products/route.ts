@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getProducts, getAllProductsAdmin, createProduct } from '@/lib/db';
+import {
+  getProducts,
+  getProductsPaginated,
+  getAllProductsAdmin,
+  createProduct,
+  type ProductFiltersDef,
+} from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
@@ -8,14 +14,17 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const isAdmin = searchParams.get('admin') === 'true';
+    const isPaginated =
+      searchParams.get('paginated') === 'true' ||
+      searchParams.has('page') ||
+      searchParams.has('limit');
 
-    if (isAdmin) {
-      const all = await getAllProductsAdmin();
-      return NextResponse.json(all);
-    }
+    const idsParam = searchParams.get('ids');
+    const ids = idsParam ? idsParam.split(',').map((id) => id.trim()).filter(Boolean) : undefined;
 
     const filters = {
       category: searchParams.get('category') || undefined,
+      subcategory: searchParams.get('subcategory') || undefined,
       search: searchParams.get('search') || undefined,
       minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
       maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
@@ -23,8 +32,24 @@ export async function GET(request: Request) {
       rating: searchParams.get('rating') ? Number(searchParams.get('rating')) : undefined,
       inStock: searchParams.get('inStock') === 'true',
       color: searchParams.get('color') || undefined,
-      sortBy: (searchParams.get('sortBy') as any) || 'featured',
+      isBestSeller: searchParams.get('isBestSeller') === 'true' ? true : undefined,
+      isNew: searchParams.get('isNew') === 'true' ? true : undefined,
+      includeUnpublished: isAdmin,
+      ids,
+      page: searchParams.get('page') ? Number(searchParams.get('page')) : 1,
+      limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : 24,
+      sortBy: ((searchParams.get('sortBy') as ProductFiltersDef['sortBy']) || (isAdmin ? 'newest' : 'featured')),
     };
+
+    if (isPaginated) {
+      const result = await getProductsPaginated(filters);
+      return NextResponse.json(result);
+    }
+
+    if (isAdmin) {
+      const all = await getAllProductsAdmin();
+      return NextResponse.json(all);
+    }
 
     const products = await getProducts(filters);
     return NextResponse.json(products);

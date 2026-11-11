@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getBanners, getAllBannersAdmin, createBanner } from '@/lib/db';
+import { getBanners, getAllBannersAdmin, createBanner, reorderBanners } from '@/lib/db';
+import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +46,34 @@ export async function POST(request: Request) {
       endDate: data.endDate,
     });
 
+    revalidatePath('/', 'layout');
     return NextResponse.json(newBanner, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to create banner' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const data = await request.json();
+    const items = data?.items;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: 'Valid items array is required' }, { status: 400 });
+    }
+
+    const sanitized = items
+      .filter((item: any) => typeof item?.id === 'string' && typeof item?.order === 'number')
+      .map((item: any) => ({ id: item.id, order: item.order }));
+
+    if (sanitized.length === 0) {
+      return NextResponse.json({ error: 'No valid banner order items provided' }, { status: 400 });
+    }
+
+    await reorderBanners(sanitized);
+    revalidatePath('/', 'layout');
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to reorder banners' }, { status: 500 });
   }
 }

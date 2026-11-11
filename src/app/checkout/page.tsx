@@ -173,8 +173,8 @@ function CheckoutContent() {
       return;
     }
 
-    if (!customerName || !customerEmail || !customerPhone) {
-      setErrorMessage('Please provide your full contact information.');
+    if (!customerName || !customerPhone) {
+      setErrorMessage('Please provide your full name and phone number.');
       return;
     }
 
@@ -194,7 +194,7 @@ function CheckoutContent() {
       const orderPayload = {
         userId: user?.id,
         customerName,
-        customerEmail,
+        customerEmail: customerEmail.trim(),
         customerPhone,
         shippingAddress: {
           fullName: customerName,
@@ -232,10 +232,34 @@ function CheckoutContent() {
         clearCart();
       }
 
+      if (data.receiptToken && data.id) {
+        try {
+          sessionStorage.setItem(`bdneeds_chalan_${data.id}`, data.receiptToken);
+          const storedGuestOrders = JSON.parse(
+            localStorage.getItem('bdneeds_guest_orders') || '[]'
+          );
+          const updatedGuestOrders = [
+            { id: data.id, token: data.receiptToken },
+            ...(Array.isArray(storedGuestOrders)
+              ? storedGuestOrders.filter((o: any) => o?.id !== data.id)
+              : []),
+          ].slice(0, 20);
+          localStorage.setItem(
+            'bdneeds_guest_orders',
+            JSON.stringify(updatedGuestOrders)
+          );
+        } catch (storageErr) {
+          console.error(storageErr);
+        }
+      }
+
       if (data.paymentUrl) {
         window.location.href = data.paymentUrl;
       } else {
-        router.push(`/order-success?orderId=${data.id}`);
+        const tokenParam = data.receiptToken
+          ? `&token=${encodeURIComponent(data.receiptToken)}`
+          : '';
+        router.push(`/order-success?orderId=${data.id}${tokenParam}`);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'An unexpected error occurred during checkout.');
@@ -322,11 +346,10 @@ function CheckoutContent() {
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      {t('emailAddress')} *
+                      {t('emailAddress')} (Optional)
                     </label>
                     <input
                       type="email"
-                      required
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
                       placeholder="customer@example.com"

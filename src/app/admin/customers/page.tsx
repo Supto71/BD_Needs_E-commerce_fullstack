@@ -6,18 +6,93 @@ import { Search, Users, Mail, Phone, ShoppingBag, DollarSign, Shield, Eye, EyeOf
 import { formatPrice, formatDate } from '@/lib/utils';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import InfiniteScrollTrigger from '@/components/admin/InfiniteScrollTrigger';
+
+const ADMIN_LIMIT = 24;
 
 export default function AdminCustomersPage() {
   const { isAdmin, isModerator } = useAuth();
   const [customers, setCustomers] = useState<any[]>([]);
+  const [adminsAndMods, setAdminsAndMods] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAdminRole, setNewAdminRole] = useState('ADMIN');
   const [isAddingAdmin, setIsAddingAdmin] = useState(false);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const fetchCustomersPage = async (targetPage: number, append: boolean) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        paginated: 'true',
+        page: String(targetPage),
+        limit: String(ADMIN_LIMIT),
+      });
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+
+      const res = await fetch(`/api/customers?${params.toString()}`);
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      setCustomers((prev) => (append ? [...prev, ...items] : items));
+      setPage(data.page || targetPage);
+      setTotalCount(typeof data.total === 'number' ? data.total : items.length);
+      setHasMore(Boolean(data.hasMore));
+      if (Array.isArray(data.adminsAndMods)) {
+        setAdminsAndMods(data.adminsAndMods);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({
+      paginated: 'true',
+      page: '1',
+      limit: String(ADMIN_LIMIT),
+    });
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+
+    fetch(`/api/customers?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        const items = Array.isArray(data.items) ? data.items : [];
+        setCustomers(items);
+        setPage(data.page || 1);
+        setTotalCount(typeof data.total === 'number' ? data.total : items.length);
+        setHasMore(Boolean(data.hasMore));
+        if (Array.isArray(data.adminsAndMods)) {
+          setAdminsAndMods(data.adminsAndMods);
+        }
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedSearch]);
 
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,16 +120,6 @@ export default function AdminCustomersPage() {
       setIsAddingAdmin(false);
     }
   };
-
-  useEffect(() => {
-    fetch('/api/customers')
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) setCustomers(data);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
 
   const handleMarkFraud = async (id: string, isFraud: boolean) => {
     if (!confirm(isFraud ? 'Mark this client as fraud?' : 'Unmark this client as fraud?')) return;
@@ -96,6 +161,8 @@ export default function AdminCustomersPage() {
       const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setCustomers((prev) => prev.filter(c => c.id !== id));
+        setAdminsAndMods((prev) => prev.filter(a => a.id !== id));
+        setTotalCount((prev) => Math.max(0, prev - 1));
       }
     } catch (e) {
       console.error(e);
@@ -156,16 +223,7 @@ export default function AdminCustomersPage() {
     }
   };
 
-  const filtered = customers.filter(
-    (c) =>
-      c.role === 'CUSTOMER' &&
-      (!search ||
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.email.toLowerCase().includes(search.toLowerCase()) ||
-        (c.phone && c.phone.includes(search)))
-  );
-
-  const adminsAndMods = customers.filter((c) => c.role === 'ADMIN' || c.role === 'MODERATOR');
+  const filtered = customers;
 
   return (
     <div className="space-y-6">
@@ -334,6 +392,14 @@ export default function AdminCustomersPage() {
             </tbody>
           </table>
         </div>
+        <InfiniteScrollTrigger
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={() => fetchCustomersPage(page + 1, true)}
+          loadedCount={filtered.length}
+          totalCount={totalCount}
+          itemLabel="customers"
+        />
       </div>
 
       {isAdmin && (
