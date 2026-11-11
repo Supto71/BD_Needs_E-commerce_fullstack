@@ -12,5 +12,5 @@ Disallow: /login
 Disallow: /register
 Disallow: /forgot-password
 
-Host: http://localhost:3000
-Sitemap: http://localhost:3000/sitemap.xml
+Host: https://bdneeds.com.bd
+Sitemap: https://bdneeds.com.bd/sitemap.xml
