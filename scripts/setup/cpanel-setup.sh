@@ -73,10 +73,19 @@ bold "1/7 Database"
 DB_FRESH=0
 if [ "$NEEDS_MYSQL" != "yes" ]; then
   ok "Skipped (NEEDS_MYSQL=no)"
-elif [ -f "$APP_ROOT/.env" ] && grep -q '^DB_NAME=' "$APP_ROOT/.env"; then
+elif [ -f "$APP_ROOT/.env" ] && grep -qE '^(DB_NAME|DATABASE_URL)=' "$APP_ROOT/.env"; then
   # shellcheck disable=SC1091
   set -a; . "$APP_ROOT/.env"; set +a
-  ok "Reusing database from existing .env ($DB_NAME)"
+  if [ -z "${DB_NAME:-}" ] && [ -n "${DATABASE_URL:-}" ]; then
+    # Parse mysql://user:pass@host:port/dbname from an existing DATABASE_URL (core perl only)
+    eval "$(perl -e '
+      sub u { my $s = shift; $s =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg; $s =~ s/\x27/\x27\\\x27\x27/g; return $s; }
+      if ($ENV{DATABASE_URL} =~ m{^mysql://([^:@]+):([^@]*)@([^:/]+)(?::(\d+))?/([^?]+)}) {
+        printf "DB_USER=\x27%s\x27\nDB_PASSWORD=\x27%s\x27\nDB_HOST=\x27%s\x27\nDB_PORT=\x27%s\x27\nDB_NAME=\x27%s\x27\n",
+          u($1), u($2), u($3), ($4 || 3306), u($5);
+      }' 2>/dev/null || true)"
+  fi
+  ok "Reusing database from existing .env (${DB_NAME:-from DATABASE_URL})"
 else
   DB_NAME="${CPUSER}_${APP_SLUG}"
   DB_USER="${CPUSER}_${APP_SLUG:0:6}"
@@ -122,7 +131,7 @@ if command -v cloudlinux-selector >/dev/null; then
   [ -n "$NODE_VERSION_USED" ] || die "No Node.js 18/20/22 available in Setup Node.js App. Ask your host to enable one."
 
   if [[ "$VERSIONS_JSON" == *"\"$APP_DIR\""* ]]; then
-    ok "Node.js app ~/$APP_DIR already exists"
+    ok "Node.js app ~/$APP_DIR already exists (ensure Startup file is 'app.js' in Setup Node.js App)"
   else
     cloudlinux-selector create --json --interpreter=nodejs --version="$NODE_VERSION_USED" \
       --app-root="$APP_DIR" --domain="$DOMAIN" --app-uri="/" --app-mode=production \
@@ -291,9 +300,10 @@ else
   ok "Cloned into $REPO_ROOT (branch main)"
 fi
 
-if [ "$NEEDS_MYSQL" = "yes" ] && [ -f "$REPO_ROOT/database/schema.sql" ]; then
+if [ "$NEEDS_MYSQL" = "yes" ] && [ -n "${DB_NAME:-}" ] && [ -f "$REPO_ROOT/database/schema.sql" ]; then
   MYCNF="$(mktemp)"; trap 'rm -f "$MYCNF"' EXIT
-  printf '[client]\nuser=%s\npassword=%s\nhost=localhost\ndefault-character-set=utf8mb4\n' "$DB_USER" "$DB_PASSWORD" > "$MYCNF"
+  printf '[client]\nuser=%s\npassword=%s\nhost=%s\nport=%s\ndefault-character-set=utf8mb4\n' \
+    "$DB_USER" "$DB_PASSWORD" "${DB_HOST:-localhost}" "${DB_PORT:-3306}" > "$MYCNF"
   TABLES="$(mysql --defaults-extra-file="$MYCNF" -N -e "SHOW TABLES" "$DB_NAME" 2>/dev/null | wc -l)"
   mysql --defaults-extra-file="$MYCNF" "$DB_NAME" < "$REPO_ROOT/database/schema.sql"
   ok "Schema applied (database/schema.sql must be idempotent: CREATE TABLE IF NOT EXISTS)"
