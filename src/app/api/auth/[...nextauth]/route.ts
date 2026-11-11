@@ -58,6 +58,8 @@ export const authOptions: NextAuthOptions = {
           });
           if (dbUser) {
             token.dbUser = dbUser;
+            token.id = dbUser.id;
+            token.role = dbUser.role;
           }
         }
         return token;
@@ -70,6 +72,8 @@ export const authOptions: NextAuthOptions = {
       try {
         if (token?.dbUser) {
           (session as any).user.dbUser = token.dbUser;
+          (session as any).user.id = (token.dbUser as any).id;
+          (session as any).user.role = (token.dbUser as any).role;
         } else if (session?.user?.email) {
           const dbUser = await prisma.user.findUnique({
             where: { email: session.user.email },
@@ -77,6 +81,8 @@ export const authOptions: NextAuthOptions = {
           });
           if (dbUser) {
             (session as any).user.dbUser = dbUser;
+            (session as any).user.id = dbUser.id;
+            (session as any).user.role = dbUser.role;
           }
         }
         return session;
@@ -95,4 +101,22 @@ export const authOptions: NextAuthOptions = {
 
 const handler = NextAuth(authOptions);
 
-export { handler as GET, handler as POST };
+async function authHandler(req: any, ctx: any) {
+  try {
+    const host = req.headers?.get?.("x-forwarded-host") || req.headers?.get?.("host");
+    if (host) {
+      const isLocal = host.includes("localhost") || host.includes("127.0.0.1");
+      // Behind the cPanel proxy x-forwarded-proto is unreliable (often "http"),
+      // so force https for every non-local host. Never fall back to localhost in production.
+      if (!(isLocal && process.env.NODE_ENV === "production")) {
+        const proto = isLocal ? "http" : "https";
+        process.env.NEXTAUTH_URL = `${proto}://${host}`;
+      }
+    }
+  } catch (e) {
+    // Fallback if headers are inaccessible
+  }
+  return handler(req, ctx);
+}
+
+export { authHandler as GET, authHandler as POST };

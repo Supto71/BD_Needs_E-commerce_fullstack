@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendOrderChalanEmail } from '@/lib/chalan';
+import { getPublicOrigin } from '@/lib/request-origin';
 
 export async function POST(request: Request) {
   try {
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
         },
         include: { items: true },
       });
-      const origin = new URL(request.url).origin;
+      const origin = getPublicOrigin(request);
       await sendOrderChalanEmail(updatedOrder, origin);
       console.log(`Order ${orderId} marked as PAID via Webhook verify`);
     } else if (data.status === 'FAILED' || data.status === 'CANCELED') {

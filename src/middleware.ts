@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { getPublicOrigin } from '@/lib/request-origin';
 
 const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
   ? new Redis({
@@ -47,9 +48,12 @@ export async function middleware(request: NextRequest) {
     // Cookie theke user info check korbo
     const userCookie = request.cookies.get('bdneeds_session');
 
+    // cPanel proxy: request.url is http://localhost:3000 — build redirects from the Host header.
+    const origin = getPublicOrigin(request);
+
     if (!userCookie) {
       // Cookie nai — login page e redirect
-      const loginUrl = new URL('/admin/login', request.url);
+      const loginUrl = new URL('/admin/login', origin);
       loginUrl.searchParams.set('from', pathname);
       return NextResponse.redirect(loginUrl);
     }
@@ -58,11 +62,11 @@ export async function middleware(request: NextRequest) {
       const user = JSON.parse(decodeURIComponent(userCookie.value));
       if (user?.role !== 'ADMIN' && user?.role !== 'MODERATOR') {
         // ADMIN ba MODERATOR na — home e redirect
-        return NextResponse.redirect(new URL('/', request.url));
+        return NextResponse.redirect(new URL('/', origin));
       }
     } catch {
       // Cookie invalid — login page e redirect
-      const loginUrl = new URL('/admin/login', request.url);
+      const loginUrl = new URL('/admin/login', origin);
       return NextResponse.redirect(loginUrl);
     }
   }

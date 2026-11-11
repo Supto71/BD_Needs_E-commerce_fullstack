@@ -163,8 +163,12 @@ CREATE TABLE `Order` (
     `trackingNumber` VARCHAR(191) NOT NULL,
     `timeline` JSON NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `uddoktaInvoiceId` VARCHAR(191) NULL,
+    `uddoktaTransactionId` VARCHAR(191) NULL,
+    `paymentDetails` JSON NULL,
 
     UNIQUE INDEX `Order_orderNumber_key`(`orderNumber`),
+    UNIQUE INDEX `Order_uddoktaInvoiceId_key`(`uddoktaInvoiceId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -213,7 +217,7 @@ CREATE TABLE `Settings` (
     `currency` VARCHAR(191) NOT NULL DEFAULT 'BDT',
     `freeShippingThreshold` DOUBLE NOT NULL DEFAULT 5000,
     `taxRate` DOUBLE NOT NULL DEFAULT 0,
-    `contactEmail` VARCHAR(191) NOT NULL DEFAULT 'contact@bdneeds.com',
+    `contactEmail` VARCHAR(191) NOT NULL DEFAULT 'contact@bdneeds.com.bd',
     `contactPhone` VARCHAR(191) NOT NULL DEFAULT '01811277828',
     `shippingFeeInsideDhaka` DOUBLE NOT NULL DEFAULT 70,
     `shippingFeeOutsideDhaka` DOUBLE NOT NULL DEFAULT 130,
@@ -258,6 +262,31 @@ CREATE TABLE `CartItem` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- CreateTable
+CREATE TABLE `PasswordResetOTP` (
+    `id` VARCHAR(191) NOT NULL,
+    `email` VARCHAR(191) NOT NULL,
+    `otp` VARCHAR(191) NOT NULL,
+    `expiresAt` DATETIME(3) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `PasswordResetOTP_email_idx`(`email`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `ContactMessage` (
+    `id` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `email` VARCHAR(191) NOT NULL,
+    `subject` VARCHAR(191) NULL,
+    `message` TEXT NOT NULL,
+    `isRead` BOOLEAN NOT NULL DEFAULT false,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- AddForeignKey
 ALTER TABLE `Subcategory` ADD CONSTRAINT `Subcategory_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `Category`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -288,6 +317,7 @@ ALTER TABLE `Cart` ADD CONSTRAINT `Cart_userId_fkey` FOREIGN KEY (`userId`) REFE
 -- AddForeignKey
 ALTER TABLE `CartItem` ADD CONSTRAINT `CartItem_cartId_fkey` FOREIGN KEY (`cartId`) REFERENCES `Cart`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
+
 -- Default Settings Record
 INSERT INTO `Settings` (`id`, `storeName`, `currency`, `freeShippingThreshold`, `taxRate`, `contactEmail`, `contactPhone`, `shippingFeeInsideDhaka`, `shippingFeeOutsideDhaka`)
 VALUES (1, 'BdNeeds', 'BDT', 5000, 0, 'contact@bdneeds.com', '01811277828', 70, 130)
@@ -297,4 +327,3 @@ ON DUPLICATE KEY UPDATE `id`=`id`;
 INSERT INTO `User` (`id`, `name`, `email`, `password`, `role`, `phone`, `createdAt`, `isFraud`)
 VALUES ('usr-admin-1', 'bdneeds Executive Admin', 'admin@bdneeds.com', 'admin123', 'ADMIN', '01811277828', NOW(), false)
 ON DUPLICATE KEY UPDATE `email`=`email`;
-

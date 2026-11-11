@@ -107,6 +107,10 @@ copyDirectorySync(
   path.join(rootDir, 'node_modules', '@prisma'),
   path.join(standaloneNodeModules, '@prisma')
 );
+copyDirectorySync(
+  path.join(rootDir, 'node_modules', 'bcryptjs'),
+  path.join(standaloneNodeModules, 'bcryptjs')
+);
 
 if (fs.existsSync(subFrontendDir)) {
   const subNodeModules = path.join(subFrontendDir, 'node_modules');
@@ -117,6 +121,10 @@ if (fs.existsSync(subFrontendDir)) {
   copyDirectorySync(
     path.join(rootDir, 'node_modules', '@prisma'),
     path.join(subNodeModules, '@prisma')
+  );
+  copyDirectorySync(
+    path.join(rootDir, 'node_modules', 'bcryptjs'),
+    path.join(subNodeModules, 'bcryptjs')
   );
 }
 
@@ -203,10 +211,14 @@ for (const sPath of serverTargets) {
   }
 }
 
-// 7. Copy sample .env to standalone
+// 7. Copy sample .env and SQL init to standalone
 const sampleEnv = path.join(rootDir, '.env.example');
 if (fs.existsSync(sampleEnv)) {
   fs.copyFileSync(sampleEnv, path.join(standaloneDir, '.env.example'));
+}
+const sqlInit = path.join(rootDir, 'cpanel-mysql-init.sql');
+if (fs.existsSync(sqlInit)) {
+  fs.copyFileSync(sqlInit, path.join(standaloneDir, 'cpanel-mysql-init.sql'));
 }
 
 // 7. Zip the standalone folder

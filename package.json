@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev --turbo",
     "build": "prisma generate && next build",
-    "build:cpanel": "node scripts/cpanel-build.js",
+    "build:cpanel": "node scripts/build-cpanel.mjs",
+    "build:cpanel:zip": "node scripts/build-cpanel.mjs --zip",
+    "build:cpanel:legacy": "node scripts/cpanel-build.js",
+    "db:schema-sql": "node scripts/gen-schema-sql.mjs",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:seed:prod": "node prisma/seed.js",
     "start": "next start",

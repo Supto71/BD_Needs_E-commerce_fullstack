@@ -1,0 +1,121 @@
+# Build on GitHub → push bundle to `deploy` branch → cPanel runs .cpanel.yml via UAPI.
+# SECRETS:   CPANEL_HOST, CPANEL_USERNAME, CPANEL_API_TOKEN
+# VARIABLES: CPANEL_REPO_PATH, APP_URL   (optional: CPANEL_PORT, NODE_VERSION)
+name: Deploy to cPanel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cpanel-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & publish bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ vars.NODE_VERSION || '20' }}
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+        env:
+          HUSKY: "0"
+
+      # Lint is reported but does not block the deploy (the codebase has existing warnings);
+      # TypeScript errors are ignored by next.config (typescript.ignoreBuildErrors).
+      - name: Checks
+        continue-on-error: true
+        run: |
+          npm run lint --if-present
+
+      - name: Build bundle
+        run: npm run build:cpanel
+        env:
+          # Public, build-time values only. Never put secrets here.
+          APP_URL: ${{ vars.APP_URL }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.APP_URL }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.APP_URL }}
+          NEXT_TELEMETRY_DISABLED: "1"
+          # Dummy URL so Prisma/Next can load during the build. The real one lives in <app_root>/.env.
+          DATABASE_URL: mysql://build:build@127.0.0.1:3306/build
+
+      - name: Push bundle to `deploy` branch
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message || 'manual run' }}
+        run: |
+          set -euo pipefail
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          REMOTE="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          # Append a commit (fast-forward) so the server's fetch always succeeds.
+          if git ls-remote --exit-code --heads "$REMOTE" deploy >/dev/null 2>&1; then
+            git clone --depth 1 --branch deploy "$REMOTE" deploy-repo
+          else
+            mkdir deploy-repo && cd deploy-repo && git init -b deploy && git remote add origin "$REMOTE" && cd ..
+          fi
+          find deploy-repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a .cpanel-build/. deploy-repo/
+          cd deploy-repo
+          git add -A -f
+          if git diff --cached --quiet; then
+            echo "No changes in bundle."
+          else
+            git commit -q -m "deploy: ${GITHUB_SHA::7} — $(printf '%s' "$COMMIT_MSG" | head -n1 | cut -c1-72)"
+            git push origin deploy
+          fi
+
+  deploy:
+    name: Trigger cPanel deployment
+    needs: build
+    if: ${{ vars.CPANEL_REPO_PATH != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CPANEL_URL: https://${{ secrets.CPANEL_HOST }}:${{ vars.CPANEL_PORT || '2083' }}
+      AUTH: "cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}"
+      REPO_PATH: ${{ vars.CPANEL_REPO_PATH }}
+    steps:
+      - name: Pull latest main on the server
+        run: |
+          set -euo pipefail
+          RES=$(curl -sS --fail-with-body -H "Authorization: $AUTH" \
+            --get "$CPANEL_URL/execute/VersionControl/update" \
+            --data-urlencode "repository_root=$REPO_PATH" --data-urlencode "branch=main")
+          echo "$RES" | jq -c '{status: .status, errors: .errors}'
+          test "$(echo "$RES" | jq -r .status)" = "1"
+
+      - name: Run .cpanel.yml deployment
+        run: |
+          set -euo pipefail
+          RES=$(curl -sS --fail-with-body -H "Authorization: $AUTH" \
+            --get "$CPANEL_URL/execute/VersionControlDeployment/create" \
+            --data-urlencode "repository_root=$REPO_PATH")
+          echo "$RES" | jq -c '{status: .status, errors: .errors, deploy_id: .data.deploy_id}'
+          test "$(echo "$RES" | jq -r .status)" = "1"
+
+      - name: Wait for the new build (health + restart check)
+        if: ${{ vars.APP_URL != '' }}
+        run: |
+          URL="${{ vars.APP_URL }}/api/health"
+          for i in $(seq 1 18); do
+            sleep 10
+            BODY=$(curl -s "$URL" || true)
+            UP=$(printf '%s' "$BODY" | grep -o '"uptimeSeconds":[0-9]*' | cut -d: -f2 || true)
+            echo "attempt $i → ${BODY:0:160}"
+            # Healthy AND restarted after this deploy (uptime under 5 minutes).
+            if [ -n "$UP" ] && [ "$UP" -lt 300 ]; then exit 0; fi
+          done
+          echo "::warning::App did not report a fresh restart. Check <app>/stderr.log and <app>/deploy.log."
+

@@ -4,8 +4,30 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
+/**
+ * Database URL resolved at runtime.
+ * - Uses DATABASE_URL if set, otherwise builds it from DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME
+ *   (the names written by scripts/setup/cpanel-setup.sh).
+ * - In production adds a small pool (connection_limit, default 3) — mandatory on shared cPanel hosting.
+ */
+function resolveDatabaseUrl(): string | undefined {
+  let url = process.env.DATABASE_URL;
+  if (!url && process.env.DB_USER && process.env.DB_NAME) {
+    const host = process.env.DB_HOST || 'localhost';
+    const port = process.env.DB_PORT || '3306';
+    url = `mysql://${encodeURIComponent(process.env.DB_USER)}:${encodeURIComponent(process.env.DB_PASSWORD || '')}@${host}:${port}/${process.env.DB_NAME}`;
+  }
+  if (url && process.env.NODE_ENV === 'production' && !/[?&]connection_limit=/.test(url)) {
+    url += `${url.includes('?') ? '&' : '?'}connection_limit=${process.env.DB_CONNECTION_LIMIT || '3'}`;
+  }
+  return url;
+}
+
+const databaseUrl = resolveDatabaseUrl();
+
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  ...(databaseUrl ? { datasources: { db: { url: databaseUrl } } } : {}),
 })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createReceiptToken, sendOrderChalanEmail } from '@/lib/chalan';
+import { getPublicOrigin } from '@/lib/request-origin';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const orderId = searchParams.get('orderId');
   const invoiceId = searchParams.get('invoice_id');
-  const origin = new URL(request.url).origin;
+  const origin = getPublicOrigin(request);
   
   if (orderId && invoiceId) {
     await verifyAndProcessPayment(invoiceId, orderId, origin);
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const orderId = searchParams.get('orderId');
-  const origin = new URL(request.url).origin;
+  const origin = getPublicOrigin(request);
   
   try {
     // UddoktaPay POST callback could be JSON or form-data

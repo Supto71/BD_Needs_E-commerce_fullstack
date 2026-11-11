@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - /bin/bash ./cpanel/remote-deploy.sh
+

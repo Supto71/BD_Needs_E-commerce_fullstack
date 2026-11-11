@@ -1,0 +1,4 @@
+# Shell scripts and cPanel config must keep LF endings (they run on Linux).
+*.sh text eol=lf
+.cpanel.yml text eol=lf
+
