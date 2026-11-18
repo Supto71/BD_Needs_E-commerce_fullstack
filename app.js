@@ -35,8 +35,10 @@ loadEnvFile(path.join(ROOT, ".env"));
 
 process.env.NODE_ENV = "production";
 process.env.NEXT_TELEMETRY_DISABLED = "1";
-// libuv thread pool: 2 keeps us far below the 100-process/thread limit.
+// Keep thread counts minimal to stay far below shared hosting 100-process/thread limits.
 if (!process.env.UV_THREADPOOL_SIZE) process.env.UV_THREADPOOL_SIZE = "2";
+if (!process.env.VIPS_CONCURRENCY) process.env.VIPS_CONCURRENCY = "1"; // libvips/sharp image processing
+if (!process.env.TOKIO_WORKER_THREADS) process.env.TOKIO_WORKER_THREADS = "2"; // Prisma Rust query engine
 
 // The heap limit only works from NODE_OPTIONS (set in Setup Node.js App env):
 //   NODE_OPTIONS=--max-old-space-size=256 --max-semi-space-size=4
